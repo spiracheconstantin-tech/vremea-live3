@@ -121,18 +121,47 @@ class WeatherWallpaperService : WallpaperService() {
                 .putString("lat", lat.toString()).putString("lon", lon.toString()).apply()
         }
 
-        // Cere o locatie noua, iar daca te-ai mutat, schimba vremea
+        // Rezerva: locatia aproximativa dupa adresa IP (merge fara GPS si fara permisiuni)
+        private fun loadByIp() {
+            Thread {
+                try {
+                    val conn = URL("https://ipwho.is/").openConnection().apply { connectTimeout = 10000; readTimeout = 10000 }
+                    val j = JSONObject(conn.getInputStream().bufferedReader().readText())
+                    if (j.optBoolean("success", false)) {
+                        val lat = j.getDouble("latitude")
+                        val lon = j.getDouble("longitude")
+                        saveLoc(lat, lon)
+                        load(lat, lon)
+                    }
+                } catch (e: Exception) {
+                    // fara internet
+                }
+            }.start()
+        }
+
+        // Cere o locatie din retea; daca nu se poate, foloseste IP-ul
         @Suppress("DEPRECATION")
         private fun fetch() {
             val prefs = getSharedPreferences("loc", MODE_PRIVATE)
             val lat0 = prefs.getString("lat", null)?.toDoubleOrNull() ?: 44.4268
             val lon0 = prefs.getString("lon", null)?.toDoubleOrNull() ?: 26.1025
             load(lat0, lon0) // arata imediat vremea de la ultima locatie cunoscuta
-            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+
+            val granted = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val lm = getSystemService(LOCATION_SERVICE) as LocationManager
+            val netOn = try { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { false }
+            if (!granted || !netOn) {
+                loadByIp()
+                return
+            }
             try {
-                val lm = getSystemService(LOCATION_SERVICE) as LocationManager
                 val last = try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { null }
-                if (last != null) { saveLoc(last.latitude, last.longitude); load(last.latitude, last.longitude) }
+                if (last != null) {
+                    saveLoc(last.latitude, last.longitude)
+                    load(last.latitude, last.longitude)
+                } else {
+                    loadByIp()
+                }
                 lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, object : LocationListener {
                     override fun onLocationChanged(l: Location) {
                         saveLoc(l.latitude, l.longitude)
@@ -143,7 +172,7 @@ class WeatherWallpaperService : WallpaperService() {
                     override fun onProviderDisabled(provider: String) {}
                 }, Looper.getMainLooper())
             } catch (e: Exception) {
-                // locatie indisponibila: ramane ultima locatie
+                loadByIp()
             }
         }
 
