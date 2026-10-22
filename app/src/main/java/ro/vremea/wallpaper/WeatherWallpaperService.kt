@@ -141,7 +141,14 @@ class WeatherWallpaperService : WallpaperService() {
 
         // Cere o locatie din retea; daca nu se poate, foloseste IP-ul
         @Suppress("DEPRECATION")
-        private fun fetch() {
+        private fun fetch() {            val ap = getSharedPreferences("app", MODE_PRIVATE)
+            val aName = ap.getString("name", null)
+            val aLat = ap.getString("lat", null)?.toDoubleOrNull()
+            val aLon = ap.getString("lon", null)?.toDoubleOrNull()
+            if (aName != null && aName != "Locația mea" && aLat != null && aLon != null) {
+                load(aLat, aLon)
+                return
+            }
             val prefs = getSharedPreferences("loc", MODE_PRIVATE)
             val lat0 = prefs.getString("lat", null)?.toDoubleOrNull() ?: 44.4268
             val lon0 = prefs.getString("lon", null)?.toDoubleOrNull() ?: 26.1025
