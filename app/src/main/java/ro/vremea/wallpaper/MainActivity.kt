@@ -258,7 +258,7 @@ class MainActivity : Activity() {
             try {
                 val j = JSONObject(URL("https://ipwho.is/").readText())
                 if (j.optBoolean("success", false)) {
-                    runOnUiThread { setCurrent(j.optString("city", "Locația mea"), j.getDouble("latitude"), j.getDouble("longitude")) }
+              runOnUiThread { setCurrent("Locația mea", j.getDouble("latitude"), j.getDouble("longitude")) }
                     return@Thread
                 }
             } catch (e: Exception) { }
