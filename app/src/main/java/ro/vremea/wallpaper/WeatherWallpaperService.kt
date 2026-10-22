@@ -26,12 +26,12 @@ private val NIGHT = listOf(
     "#0A1230", "#3A5088", "#101A3A", "#3F5590", "#1E2535", "#48546A", "#2A3038",
     "#56606A", "#141C28", "#3A4A5C", "#2A3550", "#6A7C98", "#0D111B", "#2E374D"
 ).map { Color.parseColor(it) }
-
+private class P(var x: Float, var y: Float, var v: Float, var s: Float)
 class WeatherWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = WeatherEngine()
 
     inner class WeatherEngine : Engine() {
-        private class P(var x: Float, var y: Float, var v: Float, var s: Float)
+
 
         private val handler = Handler(Looper.getMainLooper())
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
