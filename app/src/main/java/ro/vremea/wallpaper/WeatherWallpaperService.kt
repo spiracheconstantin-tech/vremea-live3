@@ -3,7 +3,10 @@ package ro.vremea.wallpaper
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -17,7 +20,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
-// Perechi (sus, jos) pentru categoriile: 0 senin, 1 partial noros, 2 noros, 3 ceata, 4 ploaie, 5 ninsoare, 6 furtuna
 private val DAY = listOf(
     "#1F8FE0", "#BFE6FB", "#3E9BDB", "#C9E4F5", "#5C7A95", "#CFDBE5", "#8A979F",
     "#D6DCDF", "#2F4256", "#7F97AB", "#7C93AD", "#E8EFF6", "#1E2433", "#5A6683"
@@ -26,13 +28,13 @@ private val NIGHT = listOf(
     "#0A1230", "#3A5088", "#101A3A", "#3F5590", "#1E2535", "#48546A", "#2A3038",
     "#56606A", "#141C28", "#3A4A5C", "#2A3550", "#6A7C98", "#0D111B", "#2E374D"
 ).map { Color.parseColor(it) }
+
 private class P(var x: Float, var y: Float, var v: Float, var s: Float)
+
 class WeatherWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = WeatherEngine()
 
     inner class WeatherEngine : Engine() {
-
-
         private val handler = Handler(Looper.getMainLooper())
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val sp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -95,18 +97,10 @@ class WeatherWallpaperService : WallpaperService() {
             }
         }
 
-        private fun fetch() {
+        // Incarca vremea pentru niste coordonate
+        private fun load(lat: Double, lon: Double) {
             Thread {
                 try {
-                    var lat = 44.4268
-                    var lon = 26.1025
-                    if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                        val lm = getSystemService(LOCATION_SERVICE) as LocationManager
-                        for (p in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)) {
-                            val l = try { lm.getLastKnownLocation(p) } catch (e: Exception) { null }
-                            if (l != null) { lat = l.latitude; lon = l.longitude; break }
-                        }
-                    }
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
                         "&current=temperature_2m,weather_code,is_day,wind_speed_10m&timezone=auto"
                     val conn = URL(url).openConnection().apply { connectTimeout = 10000; readTimeout = 10000 }
@@ -120,6 +114,37 @@ class WeatherWallpaperService : WallpaperService() {
                     // fara internet: pastreaza ultima stare
                 }
             }.start()
+        }
+
+        private fun saveLoc(lat: Double, lon: Double) {
+            getSharedPreferences("loc", MODE_PRIVATE).edit()
+                .putString("lat", lat.toString()).putString("lon", lon.toString()).apply()
+        }
+
+        // Cere o locatie noua, iar daca te-ai mutat, schimba vremea
+        @Suppress("DEPRECATION")
+        private fun fetch() {
+            val prefs = getSharedPreferences("loc", MODE_PRIVATE)
+            val lat0 = prefs.getString("lat", null)?.toDoubleOrNull() ?: 44.4268
+            val lon0 = prefs.getString("lon", null)?.toDoubleOrNull() ?: 26.1025
+            load(lat0, lon0) // arata imediat vremea de la ultima locatie cunoscuta
+            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+            try {
+                val lm = getSystemService(LOCATION_SERVICE) as LocationManager
+                val last = try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { null }
+                if (last != null) { saveLoc(last.latitude, last.longitude); load(last.latitude, last.longitude) }
+                lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, object : LocationListener {
+                    override fun onLocationChanged(l: Location) {
+                        saveLoc(l.latitude, l.longitude)
+                        load(l.latitude, l.longitude)
+                    }
+                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                    override fun onProviderEnabled(provider: String) {}
+                    override fun onProviderDisabled(provider: String) {}
+                }, Looper.getMainLooper())
+            } catch (e: Exception) {
+                // locatie indisponibila: ramane ultima locatie
+            }
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -183,12 +208,10 @@ class WeatherWallpaperService : WallpaperService() {
             val pal = if (day) DAY else NIGHT
             val sc = h / 1920f
 
-            // fundal dupa vreme
             paint.shader = LinearGradient(0f, 0f, 0f, h, pal[k * 2], pal[k * 2 + 1], Shader.TileMode.CLAMP)
             c.drawPaint(paint)
             paint.shader = null
 
-            // nuanta dupa temperatura: rece = albastru, cald = portocaliu
             val tt = temp.toFloat()
             if (tt < 15f) {
                 c.drawColor(Color.argb(((15f - max(tt, -10f)) / 25f * 80).toInt(), 120, 170, 255))
@@ -196,7 +219,6 @@ class WeatherWallpaperService : WallpaperService() {
                 c.drawColor(Color.argb(((min(tt, 38f) - 15f) / 23f * 90).toInt(), 255, 130, 50))
             }
 
-            // soare / luna + stele
             if (k <= 1) {
                 val cx = w * 0.78f
                 val cy = h * 0.14f
@@ -223,7 +245,6 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // nori
             val cloudCol = when {
                 k == 6 -> Color.argb(190, 40, 46, 62)
                 k >= 4 -> Color.argb(170, 90, 104, 120)
@@ -236,7 +257,6 @@ class WeatherWallpaperService : WallpaperService() {
                 cloud(c, cl.x, cl.y, cl.s * (w / 700f), cloudCol)
             }
 
-            // ceata
             if (k == 3) {
                 paint.color = Color.argb(60, 255, 255, 255)
                 for (i in 0..4) {
@@ -249,7 +269,6 @@ class WeatherWallpaperService : WallpaperService() {
 
             val slant = min(wind.toFloat(), 40f) / 40f * 10f
 
-            // ploaie / furtuna
             if (k == 4 || k == 6) {
                 sp.color = Color.argb(150, 200, 220, 255)
                 sp.strokeWidth = max(2f, w / 400f)
@@ -263,7 +282,6 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // ninsoare
             if (k == 5) {
                 paint.color = Color.argb(225, 255, 255, 255)
                 for (p in parts) {
@@ -276,7 +294,6 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // fulgere
             if (k == 6) {
                 val now = SystemClock.uptimeMillis()
                 if (now > nextBolt) {
@@ -303,7 +320,6 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // temperatura (sterge blocul asta daca nu o vrei pe ecran)
             paint.color = Color.argb(190, 255, 255, 255)
             paint.textAlign = Paint.Align.CENTER
             paint.textSize = w * 0.10f
