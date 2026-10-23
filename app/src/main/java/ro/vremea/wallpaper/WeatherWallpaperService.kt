@@ -67,6 +67,8 @@ class WeatherWallpaperService : WallpaperService() {
         private var boltFrames = 0
         private val bolt = ArrayList<PointF>()
         private var nextBolt = 0L
+        private var cloudBmp: Bitmap? = null
+        private var cloudKey = 0
 
         private val tick = object : Runnable {
             override fun run() {
@@ -126,10 +128,10 @@ class WeatherWallpaperService : WallpaperService() {
             }
             val nc = when (k) {
                 0 -> 0
-                1 -> max(1, (cloud / 100f * 8f).roundToInt())
-                2 -> max(5, (cloud / 100f * 8f).roundToInt())
-                6 -> 8
-                else -> 6
+                1 -> max(2, (cloud / 100f * 10f).roundToInt())
+                2 -> max(8, (cloud / 100f * 12f).roundToInt())
+                6 -> 11
+                else -> 9
             }
             clouds = ArrayList()
             repeat(nc) {
@@ -275,12 +277,46 @@ class WeatherWallpaperService : WallpaperService() {
             }
         }
 
-        private fun cloud(c: Canvas, x: Float, y: Float, s: Float, col: Int) {
-            paint.color = col
-            c.drawCircle(x, y, 36 * s, paint)
-            c.drawCircle(x + 50 * s, y - 22 * s, 48 * s, paint)
-            c.drawCircle(x + 100 * s, y - 4 * s, 38 * s, paint)
-            c.drawRoundRect(RectF(x - 30 * s, y, x + 130 * s, y + 34 * s), 17 * s, 17 * s, paint)
+        private fun shade(col: Int, f: Float): Int = Color.rgb(
+            (Color.red(col) * f).toInt().coerceIn(0, 255),
+            (Color.green(col) * f).toInt().coerceIn(0, 255),
+            (Color.blue(col) * f).toInt().coerceIn(0, 255)
+        )
+
+        private fun mixWhite(col: Int, f: Float): Int = Color.rgb(
+            (Color.red(col) + (255 - Color.red(col)) * f).toInt().coerceIn(0, 255),
+            (Color.green(col) + (255 - Color.green(col)) * f).toInt().coerceIn(0, 255),
+            (Color.blue(col) + (255 - Color.blue(col)) * f).toInt().coerceIn(0, 255)
+        )
+
+        // Deseneaza un nor pufos o singura data intr-o imagine, apoi doar o muta pe ecran
+        private fun cloudBitmap(col: Int): Bitmap {
+            val key = col and 0x00FFFFFF
+            val old = cloudBmp
+            if (old != null && cloudKey == key) return old
+            val bmp = Bitmap.createBitmap(440, 240, Bitmap.Config.ARGB_8888)
+            val cv = Canvas(bmp)
+            val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            val puffs = arrayOf(
+                floatArrayOf(110f, 130f, 46f), floatArrayOf(165f, 100f, 58f),
+                floatArrayOf(230f, 85f, 66f), floatArrayOf(295f, 105f, 58f),
+                floatArrayOf(345f, 135f, 44f), floatArrayOf(215f, 130f, 58f),
+                floatArrayOf(145f, 140f, 46f), floatArrayOf(285f, 142f, 48f)
+            )
+            fun layer(color: Int, dx: Float, dy: Float, k: Float, blur: Float, alpha: Int, base: Boolean) {
+                p.color = color
+                p.alpha = alpha
+                p.maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+                for (u in puffs) cv.drawCircle(u[0] + dx, u[1] + dy, u[2] * k, p)
+                if (base) cv.drawRoundRect(RectF(80f + dx, 140f + dy, 380f + dx, 185f + dy), 40f, 40f, p)
+            }
+            layer(shade(col, 0.78f), 0f, 12f, 1f, 16f, 255, true)
+            layer(col, 0f, 0f, 1f, 9f, 255, true)
+            layer(mixWhite(col, 0.55f), -10f, -14f, 0.7f, 12f, 150, false)
+            p.maskFilter = null
+            cloudBmp = bmp
+            cloudKey = key
+            return bmp
         }
 
         private fun makeBolt() {
@@ -374,18 +410,24 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // nori
+            // nori pufosi
             val cloudCol = when {
                 k == 6 -> Color.argb(190, 40, 46, 62)
                 k >= 4 -> Color.argb(170, 90, 104, 120)
                 !day -> Color.argb(120, 150, 160, 185)
                 else -> Color.argb(190, 255, 255, 255)
             }
+            val cbmp = cloudBitmap(cloudCol)
             for (cl in clouds) {
+                val bw = 220f * cl.s * (w / 1080f)
+                val bh = bw * 240f / 440f
                 cl.x += cl.v
-                if (cl.x > w + 200f * cl.s) cl.x = -250f * cl.s
-                cloud(c, cl.x, cl.y, cl.s * (w / 700f), cloudCol)
+                if (cl.x > w) cl.x = -bw
+                paint.color = Color.WHITE
+                paint.alpha = Color.alpha(cloudCol)
+                c.drawBitmap(cbmp, null, RectF(cl.x, cl.y, cl.x + bw, cl.y + bh), paint)
             }
+            paint.alpha = 255
 
             // ceata
             if (k == 3) {
