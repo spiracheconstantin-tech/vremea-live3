@@ -143,7 +143,7 @@ class MainActivity : Activity() {
         m.menu.add(0, 5, 4, "🌡️ Unități acum: " + (if (f) "°F, mph" else "°C, km/h") + " (schimbă)")
         m.menu.add(0, 6, 5, "🔄 Reîmprospătează")
         m.menu.add(0, 7, 6, "🖼️ Setează fundal animat")
-        m.menu.add(0, 8, 7, "📡 Sursă date: " + srcName() + " (schimbă)")
+        m.menu.add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
