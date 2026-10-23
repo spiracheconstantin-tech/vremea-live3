@@ -143,6 +143,7 @@ class MainActivity : Activity() {
         m.menu.add(0, 5, 4, "🌡️ Unități acum: " + (if (f) "°F, mph" else "°C, km/h") + " (schimbă)")
         m.menu.add(0, 6, 5, "🔄 Reîmprospătează")
         m.menu.add(0, 7, 6, "🖼️ Setează fundal animat")
+        m.menu.add(0, 8, 7, "📡 Sursă date: " + srcName() + " (schimbă)")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -171,6 +172,98 @@ class MainActivity : Activity() {
             )
         } catch (e: Exception) {
             startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
+        }
+    }
+
+    // ---------- surse de date ----------
+    private fun srcName(): String = when (prefs.getString("src", "om")) {
+        "met" -> "MET Norway"
+        "avg" -> "Medie"
+        else -> "Open-Meteo"
+    }
+
+    private fun pickSource() {
+        val opts = arrayOf("Open-Meteo (implicit)", "MET Norway (yr.no)", "Medie Open-Meteo + MET Norway")
+        val keys = arrayOf("om", "met", "avg")
+        AlertDialog.Builder(this).setTitle("Sursa datelor meteo").setItems(opts) { _, i ->
+            prefs.edit().putString("src", keys[i]).apply()
+            load()
+        }.show()
+    }
+
+    private fun symToCode(s: String): Int {
+        val x = s.lowercase()
+        return when {
+            x.contains("thunder") -> 95
+            x.contains("sleet") -> 67
+            x.contains("snow") -> when { x.contains("heavy") -> 75; x.contains("light") -> 71; else -> 73 }
+            x.contains("rain") -> when { x.contains("heavy") -> 65; x.contains("light") -> 61; else -> 63 }
+            x.contains("fog") -> 45
+            x.startsWith("clearsky") -> 0
+            x.startsWith("fair") -> 1
+            x.startsWith("partlycloudy") -> 2
+            x.startsWith("cloudy") -> 3
+            else -> -1
+        }
+    }
+
+    private fun fetchMet(lat: String, lon: String): JSONObject? {
+        return try {
+            val u = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=" +
+                "%.4f".format(Locale.US, lat.toDouble()) + "&lon=" + "%.4f".format(Locale.US, lon.toDouble())
+            val conn = URL(u).openConnection().apply {
+                connectTimeout = 10000
+                readTimeout = 10000
+                setRequestProperty("User-Agent", "VremeaLive/1.0 github.com/spiracheconstantin-tech/vremea-live3")
+            }
+            JSONObject(conn.getInputStream().bufferedReader().readText())
+                .getJSONObject("properties").getJSONArray("timeseries").getJSONObject(0).getJSONObject("data")
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun mergeMet(j: JSONObject, met: JSONObject, avg: Boolean, f: Boolean) {
+        val cur = j.getJSONObject("current")
+        val d = met.getJSONObject("instant").getJSONObject("details")
+        fun mix(key: String, v: Double) {
+            val old = cur.optDouble(key, v)
+            cur.put(key, if (avg) (old + v) / 2.0 else v)
+        }
+        val ms = if (f) 2.23694 else 3.6
+        val oldT = cur.getDouble("temperature_2m")
+        val oldW = cur.optDouble("wind_speed_10m", 0.0)
+        j.put("cmp_om_t", oldT)
+        j.put("cmp_om_w", oldW)
+        val tC = d.optDouble("air_temperature", Double.NaN)
+        if (!tC.isNaN()) {
+            val tv2 = if (f) tC * 9.0 / 5.0 + 32.0 else tC
+            j.put("cmp_met_t", tv2)
+            mix("temperature_2m", tv2)
+            cur.put("apparent_temperature", cur.getDouble("apparent_temperature") + (cur.getDouble("temperature_2m") - oldT))
+        }
+        val ws = d.optDouble("wind_speed", Double.NaN)
+        if (!ws.isNaN()) {
+            j.put("cmp_met_w", ws * ms)
+            mix("wind_speed_10m", ws * ms)
+        }
+        val wg = d.optDouble("wind_speed_of_gust", Double.NaN)
+        if (!wg.isNaN()) mix("wind_gusts_10m", wg * ms)
+        val wd = d.optDouble("wind_from_direction", Double.NaN)
+        if (!wd.isNaN() && !avg) cur.put("wind_direction_10m", wd)
+        val rh = d.optDouble("relative_humidity", Double.NaN)
+        if (!rh.isNaN()) mix("relative_humidity_2m", rh)
+        val pr = d.optDouble("air_pressure_at_sea_level", Double.NaN)
+        if (!pr.isNaN()) mix("pressure_msl", pr)
+        val cl = d.optDouble("cloud_area_fraction", Double.NaN)
+        if (!cl.isNaN()) mix("cloud_cover", cl)
+        if (!avg) {
+            val n1 = met.optJSONObject("next_1_hours")
+            val sym = n1?.optJSONObject("summary")?.optString("symbol_code", "") ?: ""
+            val code = symToCode(sym)
+            if (code >= 0) cur.put("weather_code", code)
+            val pa = n1?.optJSONObject("details")?.optDouble("precipitation_amount", Double.NaN) ?: Double.NaN
+            if (!pa.isNaN()) cur.put("precipitation", pa)
         }
     }
 
@@ -259,7 +352,7 @@ class MainActivity : Activity() {
             try {
                 val j = JSONObject(URL("https://ipwho.is/").readText())
                 if (j.optBoolean("success", false)) {
-              runOnUiThread { setCurrent("Locația mea", j.getDouble("latitude"), j.getDouble("longitude")) }
+                    runOnUiThread { setCurrent("Locația mea", j.getDouble("latitude"), j.getDouble("longitude")) }
                     return@Thread
                 }
             } catch (e: Exception) { }
@@ -268,108 +361,6 @@ class MainActivity : Activity() {
     }
 
     // ---------- date meteo ----------
-    private fun loadOld() {
-        val lat = prefs.getString("lat", null) ?: return
-        val lon = prefs.getString("lon", null) ?: return
-        val f = prefs.getString("units", "c") == "f"
-        titleTv.text = prefs.getString("name", "")
-        Thread {
-            try {
-                val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                    "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day" +
-                    "&hourly=temperature_2m,weather_code,precipitation_probability" +
-                    "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max" +
-                    "&timezone=auto&forecast_days=7" + (if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else "")
-                val j = JSONObject(URL(url).readText())
-                runOnUiThread { render(j, f) }
-            } catch (e: Exception) {
-                runOnUiThread { toast("Nu pot încărca datele. Verifică internetul.") }
-            }
-        }.start()
-    }
-    private fun srcName(): String = when (prefs.getString("src", "om")) {
-        "met" -> "MET Norway"
-        "avg" -> "Medie"
-        else -> "Open-Meteo"
-    }
-
-    private fun pickSource() {
-        val opts = arrayOf("Open-Meteo (implicit)", "MET Norway (yr.no)", "Medie Open-Meteo + MET Norway")
-        val keys = arrayOf("om", "met", "avg")
-        AlertDialog.Builder(this).setTitle("Sursa datelor meteo").setItems(opts) { _, i ->
-            prefs.edit().putString("src", keys[i]).apply()
-            load()
-        }.show()
-    }
-
-    private fun symToCode(s: String): Int {
-        val x = s.lowercase()
-        return when {
-            x.contains("thunder") -> 95
-            x.contains("sleet") -> 67
-            x.contains("snow") -> when { x.contains("heavy") -> 75; x.contains("light") -> 71; else -> 73 }
-            x.contains("rain") -> when { x.contains("heavy") -> 65; x.contains("light") -> 61; else -> 63 }
-            x.contains("fog") -> 45
-            x.startsWith("clearsky") -> 0
-            x.startsWith("fair") -> 1
-            x.startsWith("partlycloudy") -> 2
-            x.startsWith("cloudy") -> 3
-            else -> -1
-        }
-    }
-
-    private fun fetchMet(lat: String, lon: String): JSONObject? {
-        return try {
-            val u = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=" +
-                "%.4f".format(Locale.US, lat.toDouble()) + "&lon=" + "%.4f".format(Locale.US, lon.toDouble())
-            val conn = URL(u).openConnection().apply {
-                connectTimeout = 10000
-                readTimeout = 10000
-                setRequestProperty("User-Agent", "VremeaLive/1.0 github.com/spiracheconstantin-tech/vremea-live3")
-            }
-            JSONObject(conn.getInputStream().bufferedReader().readText())
-                .getJSONObject("properties").getJSONArray("timeseries").getJSONObject(0).getJSONObject("data")
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun mergeMet(j: JSONObject, met: JSONObject, avg: Boolean, f: Boolean) {
-        val cur = j.getJSONObject("current")
-        val d = met.getJSONObject("instant").getJSONObject("details")
-        fun mix(key: String, v: Double) {
-            val old = cur.optDouble(key, v)
-            cur.put(key, if (avg) (old + v) / 2.0 else v)
-        }
-        val ms = if (f) 2.23694 else 3.6
-        val oldT = cur.getDouble("temperature_2m")
-        val tC = d.optDouble("air_temperature", Double.NaN)
-        if (!tC.isNaN()) {
-            mix("temperature_2m", if (f) tC * 9.0 / 5.0 + 32.0 else tC)
-            cur.put("apparent_temperature", cur.getDouble("apparent_temperature") + (cur.getDouble("temperature_2m") - oldT))
-        }
-        val ws = d.optDouble("wind_speed", Double.NaN)
-        if (!ws.isNaN()) mix("wind_speed_10m", ws * ms)
-        val wg = d.optDouble("wind_speed_of_gust", Double.NaN)
-        if (!wg.isNaN()) mix("wind_gusts_10m", wg * ms)
-        val wd = d.optDouble("wind_from_direction", Double.NaN)
-        if (!wd.isNaN() && !avg) cur.put("wind_direction_10m", wd)
-        val rh = d.optDouble("relative_humidity", Double.NaN)
-        if (!rh.isNaN()) mix("relative_humidity_2m", rh)
-        val pr = d.optDouble("air_pressure_at_sea_level", Double.NaN)
-        if (!pr.isNaN()) mix("pressure_msl", pr)
-        val cl = d.optDouble("cloud_area_fraction", Double.NaN)
-        if (!cl.isNaN()) mix("cloud_cover", cl)
-        if (!avg) {
-            val n1 = met.optJSONObject("next_1_hours")
-            val sym = n1?.optJSONObject("summary")?.optString("symbol_code", "") ?: ""
-            val code = symToCode(sym)
-            if (code >= 0) cur.put("weather_code", code)
-            val pa = n1?.optJSONObject("details")?.optDouble("precipitation_amount", Double.NaN) ?: Double.NaN
-            if (!pa.isNaN()) cur.put("precipitation", pa)
-        }
-    }
-
     private fun load() {
         val lat = prefs.getString("lat", null) ?: return
         val lon = prefs.getString("lon", null) ?: return
@@ -401,6 +392,7 @@ class MainActivity : Activity() {
             }
         }.start()
     }
+
     private fun cell(t: String, w: Float, end: Boolean = false) = tv(t, 15f).apply {
         if (end) gravity = Gravity.END
         layoutParams = LinearLayout.LayoutParams(0, -2, w)
@@ -426,6 +418,23 @@ class MainActivity : Activity() {
         val mx = d.getJSONArray("temperature_2m_max").getDouble(0).roundToInt()
         val mn = d.getJSONArray("temperature_2m_min").getDouble(0).roundToInt()
         add(tv("Max $mx°  ·  Min $mn°", 16f, alpha = .9f).apply { gravity = Gravity.CENTER }, 4)
+
+        // comparatie intre surse
+        if (j.has("cmp_om_t") && j.has("cmp_met_t")) {
+            val cp = panel()
+            cp.addView(tv("📡 Comparație surse", 14f, alpha = .85f))
+            val r1 = LinearLayout(this).apply { setPadding(0, dp(8), 0, dp(2)) }
+            r1.addView(cell("Open-Meteo", 2f))
+            r1.addView(cell("${j.getDouble("cmp_om_t").roundToInt()}$tu", 1f, true))
+            r1.addView(cell("${j.optDouble("cmp_om_w", 0.0).roundToInt()} $su", 1.4f, true))
+            val r2 = LinearLayout(this).apply { setPadding(0, dp(4), 0, dp(2)) }
+            r2.addView(cell("MET Norway", 2f))
+            r2.addView(cell("${j.getDouble("cmp_met_t").roundToInt()}$tu", 1f, true))
+            r2.addView(cell(if (j.has("cmp_met_w")) "${j.getDouble("cmp_met_w").roundToInt()} $su" else "-", 1.4f, true))
+            cp.addView(r1)
+            cp.addView(r2)
+            add(cp, 12)
+        }
 
         // carduri cu date
         val dirs = arrayOf("N", "NE", "E", "SE", "S", "SV", "V", "NV")
@@ -498,6 +507,6 @@ class MainActivity : Activity() {
             dpn.addView(row)
         }
         add(dpn, 12)
-            add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
+        add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
