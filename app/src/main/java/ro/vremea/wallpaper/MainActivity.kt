@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.*
 import org.json.JSONArray
@@ -30,6 +31,9 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var titleTv: TextView
     private lateinit var body: LinearLayout
+        private lateinit var refreshTv: TextView
+    private var pullY = -1f
+    private var pulled = false
     private val prefs by lazy { getSharedPreferences("app", Context.MODE_PRIVATE) }
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
@@ -107,14 +111,34 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), 0, dp(16), dp(32))
         }
-        val scroll = ScrollView(this).apply { addView(body) }
-        root.addView(top)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
+      
         setContentView(root)
         setBg(0, true)
         if (!prefs.contains("lat")) myLocation()
     }
-
+        val scroll = ScrollView(this).apply { addView(body) }
+        refreshTv = tv("⟳ Se reîmprospătează…", 13f, alpha = .9f).apply {
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            setPadding(0, 0, 0, dp(6))
+        }
+        scroll.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { pullY = if (scroll.scrollY == 0) e.rawY else -1f; pulled = false }
+                MotionEvent.ACTION_MOVE -> {
+                    if (pullY < 0f && scroll.scrollY == 0) pullY = e.rawY
+                    if (pullY >= 0f) {
+                        if (scroll.scrollY != 0) pullY = -1f
+                        else if (e.rawY - pullY > dp(100) && !pulled) { pulled = true; refreshNow() }
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { pullY = -1f; pulled = false }
+            }
+            false
+        }
+        root.addView(top)
+        root.addView(refreshTv)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
     override fun onResume() {
         super.onResume()
         handler.removeCallbacks(ticker)
@@ -159,7 +183,11 @@ class MainActivity : Activity() {
         }
         m.show()
     }
-
+    private fun refreshNow() {
+        refreshTv.visibility = View.VISIBLE
+        load()
+        handler.postDelayed({ refreshTv.visibility = View.GONE }, 2500)
+    }
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 
     private fun openChooser() {
