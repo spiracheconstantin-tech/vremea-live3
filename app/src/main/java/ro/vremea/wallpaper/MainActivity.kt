@@ -31,7 +31,7 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var titleTv: TextView
     private lateinit var body: LinearLayout
-        private lateinit var refreshTv: TextView
+    private lateinit var refreshTv: TextView
     private var pullY = -1f
     private var pulled = false
     private val prefs by lazy { getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -111,34 +111,44 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), 0, dp(16), dp(32))
         }
-      
-        setContentView(root)
-        setBg(0, true)
-        if (!prefs.contains("lat")) myLocation()
-    }
-        val scroll = ScrollView(this).apply { addView(body) }
-        refreshTv = tv("⟳ Se reîmprospătează…", 13f, alpha = .9f).apply {
-            gravity = Gravity.CENTER
-            visibility = View.GONE
-            setPadding(0, 0, 0, dp(6))
-        }
-        scroll.setOnTouchListener { _, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { pullY = if (scroll.scrollY == 0) e.rawY else -1f; pulled = false }
+        val scroll = ScrollView(this)
+        scroll.addView(body)
+        refreshTv = tv("⟳ Se reîmprospătează…", 13f, alpha = .9f)
+        refreshTv.gravity = Gravity.CENTER
+        refreshTv.visibility = View.GONE
+        refreshTv.setPadding(0, 0, 0, dp(6))
+        scroll.setOnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    pullY = if (scroll.scrollY == 0) ev.rawY else -1f
+                    pulled = false
+                }
                 MotionEvent.ACTION_MOVE -> {
-                    if (pullY < 0f && scroll.scrollY == 0) pullY = e.rawY
+                    if (pullY < 0f && scroll.scrollY == 0) pullY = ev.rawY
                     if (pullY >= 0f) {
-                        if (scroll.scrollY != 0) pullY = -1f
-                        else if (e.rawY - pullY > dp(100) && !pulled) { pulled = true; refreshNow() }
+                        if (scroll.scrollY != 0) {
+                            pullY = -1f
+                        } else if (ev.rawY - pullY > dp(100) && !pulled) {
+                            pulled = true
+                            refreshNow()
+                        }
                     }
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { pullY = -1f; pulled = false }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    pullY = -1f
+                    pulled = false
+                }
             }
             false
         }
         root.addView(top)
         root.addView(refreshTv)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
+        setContentView(root)
+        setBg(0, true)
+        if (!prefs.contains("lat")) myLocation()
+    }
+
     override fun onResume() {
         super.onResume()
         handler.removeCallbacks(ticker)
@@ -154,6 +164,12 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) myLocation()
+    }
+
+    private fun refreshNow() {
+        refreshTv.visibility = View.VISIBLE
+        load()
+        handler.postDelayed({ refreshTv.visibility = View.GONE }, 2500)
     }
 
     // ---------- meniu ----------
@@ -183,11 +199,7 @@ class MainActivity : Activity() {
         }
         m.show()
     }
-    private fun refreshNow() {
-        refreshTv.visibility = View.VISIBLE
-        load()
-        handler.postDelayed({ refreshTv.visibility = View.GONE }, 2500)
-    }
+
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 
     private fun openChooser() {
@@ -327,214 +339,4 @@ class MainActivity : Activity() {
                 val u = "https://geocoding-api.open-meteo.com/v1/search?name=" + URLEncoder.encode(q, "UTF-8") + "&count=8&language=ro"
                 val res = JSONObject(URL(u).readText()).optJSONArray("results")
                 runOnUiThread {
-                    if (res == null || res.length() == 0) { toast("Niciun rezultat"); return@runOnUiThread }
-                    val names = Array(res.length()) {
-                        val o = res.getJSONObject(it)
-                        listOf(o.optString("name"), o.optString("admin1"), o.optString("country")).filter { s -> s.isNotEmpty() }.joinToString(", ")
-                    }
-                    AlertDialog.Builder(this@MainActivity).setTitle("Alege orașul").setItems(names) { _, i ->
-                        val o = res.getJSONObject(i)
-                        choose(names[i], o.getDouble("latitude"), o.getDouble("longitude"))
-                    }.show()
-                }
-            } catch (e: Exception) {
-                runOnUiThread { toast("Căutarea a eșuat. Verifică internetul.") }
-            }
-        }.start()
-    }
-
-    private fun showFavs() {
-        val fa = favs()
-        if (fa.length() == 0) { toast("Nu ai orașe salvate. Caută unul."); return }
-        val names = Array(fa.length()) { fa.getJSONObject(it).getString("name") }
-        AlertDialog.Builder(this).setTitle("Orașele mele").setItems(names) { _, i ->
-            val o = fa.getJSONObject(i)
-            setCurrent(o.getString("name"), o.getDouble("lat"), o.getDouble("lon"))
-        }.show()
-    }
-
-    private fun removeCurrent() {
-        val cur = prefs.getString("name", "")
-        val fa = favs()
-        val nf = JSONArray()
-        for (i in 0 until fa.length()) if (fa.getJSONObject(i).getString("name") != cur) nf.put(fa.getJSONObject(i))
-        prefs.edit().putString("favs", nf.toString()).apply()
-        toast("Șters din listă")
-    }
-
-    private fun myLocation() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                val l = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                if (l != null) { setCurrent("Locația mea", l.latitude, l.longitude); return }
-            } catch (e: Exception) { }
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 1)
-        }
-        byIp()
-    }
-
-    private fun byIp() {
-        Thread {
-            try {
-                val j = JSONObject(URL("https://ipwho.is/").readText())
-                if (j.optBoolean("success", false)) {
-                    runOnUiThread { setCurrent("Locația mea", j.getDouble("latitude"), j.getDouble("longitude")) }
-                    return@Thread
-                }
-            } catch (e: Exception) { }
-            runOnUiThread { if (!prefs.contains("lat")) setCurrent("București", 44.4268, 26.1025) }
-        }.start()
-    }
-
-    // ---------- date meteo ----------
-    private fun load() {
-        val lat = prefs.getString("lat", null) ?: return
-        val lon = prefs.getString("lon", null) ?: return
-        val f = prefs.getString("units", "c") == "f"
-        val src = prefs.getString("src", "om") ?: "om"
-        titleTv.text = prefs.getString("name", "")
-        Thread {
-            try {
-                val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                    "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day" +
-                    "&hourly=temperature_2m,weather_code,precipitation_probability" +
-                    "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max" +
-                    "&timezone=auto&forecast_days=7" + (if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else "")
-                val j = JSONObject(URL(url).readText())
-                var label = "Open-Meteo"
-                if (src != "om") {
-                    val met = fetchMet(lat, lon)
-                    if (met != null) {
-                        mergeMet(j, met, src == "avg", f)
-                        label = if (src == "avg") "Open-Meteo + MET Norway (medie)" else "MET Norway (yr.no), prognoză Open-Meteo"
-                    } else {
-                        runOnUiThread { toast("MET Norway indisponibil, folosesc Open-Meteo") }
-                    }
-                }
-                j.put("src", label)
-                runOnUiThread { render(j, f) }
-            } catch (e: Exception) {
-                runOnUiThread { toast("Nu pot încărca datele. Verifică internetul.") }
-            }
-        }.start()
-    }
-
-    private fun cell(t: String, w: Float, end: Boolean = false) = tv(t, 15f).apply {
-        if (end) gravity = Gravity.END
-        layoutParams = LinearLayout.LayoutParams(0, -2, w)
-    }
-
-    private fun render(j: JSONObject, f: Boolean) {
-        val cur = j.getJSONObject("current")
-        val d = j.getJSONObject("daily")
-        val hr = j.getJSONObject("hourly")
-        val day = cur.getInt("is_day") == 1
-        val (k, label, icon) = info(cur.getInt("weather_code"), day)
-        setBg(k, day)
-        val tu = if (f) "°F" else "°C"
-        val su = if (f) "mph" else "km/h"
-        body.removeAllViews()
-
-        add(tv(icon, 72f).apply { gravity = Gravity.CENTER })
-        add(tv("${cur.getDouble("temperature_2m").roundToInt()}°", 88f).apply {
-            gravity = Gravity.CENTER
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-        })
-        add(tv(label, 22f).apply { gravity = Gravity.CENTER })
-        val mx = d.getJSONArray("temperature_2m_max").getDouble(0).roundToInt()
-        val mn = d.getJSONArray("temperature_2m_min").getDouble(0).roundToInt()
-        add(tv("Max $mx°  ·  Min $mn°", 16f, alpha = .9f).apply { gravity = Gravity.CENTER }, 4)
-
-        // comparatie intre surse
-        if (j.has("cmp_om_t") && j.has("cmp_met_t")) {
-            val cp = panel()
-            cp.addView(tv("📡 Comparație surse", 14f, alpha = .85f))
-            val r1 = LinearLayout(this).apply { setPadding(0, dp(8), 0, dp(2)) }
-            r1.addView(cell("Open-Meteo", 2f))
-            r1.addView(cell("${j.getDouble("cmp_om_t").roundToInt()}$tu", 1f, true))
-            r1.addView(cell("${j.optDouble("cmp_om_w", 0.0).roundToInt()} $su", 1.4f, true))
-            val r2 = LinearLayout(this).apply { setPadding(0, dp(4), 0, dp(2)) }
-            r2.addView(cell("MET Norway", 2f))
-            r2.addView(cell("${j.getDouble("cmp_met_t").roundToInt()}$tu", 1f, true))
-            r2.addView(cell(if (j.has("cmp_met_w")) "${j.getDouble("cmp_met_w").roundToInt()} $su" else "-", 1.4f, true))
-            cp.addView(r1)
-            cp.addView(r2)
-            add(cp, 12)
-        }
-
-        // carduri cu date
-        val dirs = arrayOf("N", "NE", "E", "SE", "S", "SV", "V", "NV")
-        val dir = dirs[((cur.getDouble("wind_direction_10m") + 22.5) / 45).toInt() % 8]
-        val uv = d.getJSONArray("uv_index_max").getDouble(0)
-        val uvTxt = when { uv < 3 -> "Scăzut"; uv < 6 -> "Moderat"; uv < 8 -> "Ridicat"; uv < 11 -> "Foarte ridicat"; else -> "Extrem" }
-        val cards = listOf(
-            Triple("💨 Vânt", "${cur.getDouble("wind_speed_10m").roundToInt()} $su", "Din $dir · rafale ${cur.getDouble("wind_gusts_10m").roundToInt()}"),
-            Triple("🌡️ RealFeel", "${cur.getDouble("apparent_temperature").roundToInt()}$tu", "Temperatura resimțită"),
-            Triple("💧 Umiditate", "${cur.getInt("relative_humidity_2m")}%", "Aer relativ"),
-            Triple("🧭 Presiune", "${cur.getDouble("pressure_msl").roundToInt()} hPa", "La nivelul mării"),
-            Triple("☁️ Nori", "${cur.getInt("cloud_cover")}%", "Acoperire"),
-            Triple("☔ Precipitații", "${cur.getDouble("precipitation")} mm", "Șanse azi: ${d.getJSONArray("precipitation_probability_max").optInt(0)}%"),
-            Triple("🔆 Index UV", "%.1f".format(uv), uvTxt),
-            Triple("🌅 Soare", "↑ " + d.getJSONArray("sunrise").getString(0).substring(11), "↓ " + d.getJSONArray("sunset").getString(0).substring(11))
-        )
-        for (r in cards.chunked(2)) {
-            val row = LinearLayout(this)
-            for (c in r) {
-                val p = panel()
-                p.addView(tv(c.first, 13f, alpha = .85f))
-                p.addView(tv(c.second, 24f, true))
-                p.addView(tv(c.third, 12f, alpha = .85f))
-                row.addView(p, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
-            }
-            add(row, 8)
-        }
-
-        // următoarele 24 de ore
-        val hp = panel()
-        hp.addView(tv("Următoarele 24 de ore", 14f, alpha = .85f))
-        val hs = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val hl = LinearLayout(this)
-        val times = hr.getJSONArray("time")
-        val nowH = cur.getString("time").substring(0, 13)
-        var s = 0
-        while (s < times.length() - 1 && times.getString(s).substring(0, 13) < nowH) s++
-        for (i in s until minOf(s + 24, times.length())) {
-            val hh = times.getString(i).substring(11, 13).toInt()
-            val ic = info(hr.getJSONArray("weather_code").getInt(i), hh in 6..19).third
-            val col = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(10), dp(8), dp(10), dp(4))
-            }
-            col.addView(tv("%02d:00".format(hh), 13f, alpha = .85f))
-            col.addView(tv(ic, 26f))
-            col.addView(tv("${hr.getJSONArray("temperature_2m").getDouble(i).roundToInt()}°", 16f, true))
-            val pp = hr.getJSONArray("precipitation_probability").optInt(i)
-            col.addView(tv(if (pp > 0) "💧$pp%" else " ", 11f, alpha = .85f))
-            hl.addView(col)
-        }
-        hs.addView(hl)
-        hp.addView(hs)
-        add(hp, 12)
-
-        // 7 zile
-        val dpn = panel()
-        dpn.addView(tv("Următoarele 7 zile", 14f, alpha = .85f))
-        val inF = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val outF = SimpleDateFormat("EEEE", Locale("ro"))
-        val dates = d.getJSONArray("time")
-        for (i in 0 until dates.length()) {
-            val nm = if (i == 0) "Azi" else outF.format(inF.parse(dates.getString(i))!!).replaceFirstChar { it.uppercase() }
-            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(2)) }
-            row.addView(cell(nm, 2.2f))
-            row.addView(cell(info(d.getJSONArray("weather_code").getInt(i), true).third, 0.8f))
-            row.addView(cell("💧${d.getJSONArray("precipitation_probability_max").optInt(i)}%", 1.4f))
-            row.addView(cell("${d.getJSONArray("temperature_2m_min").getDouble(i).roundToInt()}° / ${d.getJSONArray("temperature_2m_max").getDouble(i).roundToInt()}°", 2f, true))
-            dpn.addView(row)
-        }
-        add(dpn, 12)
-        add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
-    }
-}
+                    if (res == null || res.length() == 0) { toast("Niciun rezultat");
