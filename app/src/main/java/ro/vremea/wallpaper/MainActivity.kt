@@ -16,7 +16,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.widget.*
 import org.json.JSONArray
@@ -31,9 +30,6 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var titleTv: TextView
     private lateinit var body: LinearLayout
-    private lateinit var refreshTv: TextView
-    private var pullY = -1f
-    private var pulled = false
     private val prefs by lazy { getSharedPreferences("app", Context.MODE_PRIVATE) }
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
@@ -113,36 +109,7 @@ class MainActivity : Activity() {
         }
         val scroll = ScrollView(this)
         scroll.addView(body)
-        refreshTv = tv("⟳ Se reîmprospătează…", 13f, alpha = .9f)
-        refreshTv.gravity = Gravity.CENTER
-        refreshTv.visibility = View.GONE
-        refreshTv.setPadding(0, 0, 0, dp(6))
-        scroll.setOnTouchListener { _, ev ->
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    pullY = if (scroll.scrollY == 0) ev.rawY else -1f
-                    pulled = false
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (pullY < 0f && scroll.scrollY == 0) pullY = ev.rawY
-                    if (pullY >= 0f) {
-                        if (scroll.scrollY != 0) {
-                            pullY = -1f
-                        } else if (ev.rawY - pullY > dp(100) && !pulled) {
-                            pulled = true
-                            refreshNow()
-                        }
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    pullY = -1f
-                    pulled = false
-                }
-            }
-            false
-        }
         root.addView(top)
-        root.addView(refreshTv)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
         setContentView(root)
         setBg(0, true)
@@ -164,12 +131,6 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) myLocation()
-    }
-
-    private fun refreshNow() {
-        refreshTv.visibility = View.VISIBLE
-        load()
-        handler.postDelayed({ refreshTv.visibility = View.GONE }, 2500)
     }
 
     // ---------- meniu ----------
@@ -329,14 +290,3 @@ class MainActivity : Activity() {
         et.hint = "Nume oraș"
         AlertDialog.Builder(this).setTitle("Caută oraș").setView(et)
             .setPositiveButton("Caută") { _, _ -> search(et.text.toString().trim()) }
-            .setNegativeButton("Anulează", null).show()
-    }
-
-    private fun search(q: String) {
-        if (q.isEmpty()) return
-        Thread {
-            try {
-                val u = "https://geocoding-api.open-meteo.com/v1/search?name=" + URLEncoder.encode(q, "UTF-8") + "&count=8&language=ro"
-                val res = JSONObject(URL(u).readText()).optJSONArray("results")
-                runOnUiThread {
-                    if (res == null || res.length() == 0) { toast("Niciun rezultat");
