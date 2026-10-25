@@ -146,8 +146,18 @@ class WeatherWallpaperService : WallpaperService() {
             hail = ArrayList()
             if (k == 6 && (code == 96 || code == 99)) {
                 repeat(60) { hail.add(P(rnd.nextFloat() * w, rnd.nextFloat() * h, 30f + rnd.nextFloat() * 12f, 3f + rnd.nextFloat() * 3f)) }
+                    val nc = when (k) {
+                0 -> 0
+                1 -> max(1, (cloud / 100f * 4f).roundToInt())
+                2 -> max(3, (cloud / 100f * 5f).roundToInt())
+                6 -> 5
+                3 -> 2
+                else -> 4
             }
-                        val nc = when (k) {
+            clouds = ArrayList()
+            repeat(nc) {
+                clouds.add(P(rnd.nextFloat() * w, h * (0.05f + rnd.nextFloat() * 0.35f), 0.3f + rnd.nextFloat() * 0.8f, 0.8f + rnd.nextFloat() * 0.8f))
+            }    }
                 0 -> 0
                 1 -> max(1, (cloud / 100f * 4f).roundToInt())
                 2 -> max(3, (cloud / 100f * 5f).roundToInt())
