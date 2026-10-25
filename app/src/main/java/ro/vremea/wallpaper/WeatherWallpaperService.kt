@@ -147,7 +147,14 @@ class WeatherWallpaperService : WallpaperService() {
             if (k == 6 && (code == 96 || code == 99)) {
                 repeat(60) { hail.add(P(rnd.nextFloat() * w, rnd.nextFloat() * h, 30f + rnd.nextFloat() * 12f, 3f + rnd.nextFloat() * 3f)) }
             }
-            val nc = when (k) {
+                        val nc = when (k) {
+                0 -> 0
+                1 -> max(1, (cloud / 100f * 4f).roundToInt())
+                2 -> max(3, (cloud / 100f * 5f).roundToInt())
+                6 -> 5
+                3 -> 2
+                else -> 4
+            } {
                 0 -> 0
                 1 -> max(2, (cloud / 100f * 10f).roundToInt())
                 2 -> max(8, (cloud / 100f * 12f).roundToInt())
@@ -157,7 +164,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
             clouds = ArrayList()
             repeat(nc) {
-                clouds.add(P(rnd.nextFloat() * w, h * (0.05f + rnd.nextFloat() * 0.35f), 0.3f + rnd.nextFloat() * 0.8f, 1f + rnd.nextFloat() * 1.5f))
+            clouds.add(P(rnd.nextFloat() * w, h * (0.05f + rnd.nextFloat() * 0.35f), 0.3f + rnd.nextFloat() * 0.8f, 0.8f + rnd.nextFloat() * 0.8f))
             }
             wisps = ArrayList()
             if (k == 3) {
@@ -558,7 +565,7 @@ class WeatherWallpaperService : WallpaperService() {
             val tintA = if (day && dist < 50) ((1f - dist / 50f) * 90f).toInt() else 0
             paint.colorFilter = if (tintA > 0) PorterDuffColorFilter(Color.argb(tintA, 255, 140, 80), PorterDuff.Mode.SRC_ATOP) else null
             for (cl in clouds) {
-                val bw = 220f * cl.s * (w / 1080f)
+                val bw = 120f * cl.s * (w / 1080f)
                 val bh = bw * 240f / 440f
                 cl.x += cl.v
                 if (cl.x > w) cl.x = -bw
