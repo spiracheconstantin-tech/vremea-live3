@@ -75,6 +75,7 @@ class WeatherWallpaperService : WallpaperService() {
         @Volatile private var wind = 5.0
         @Volatile private var day = true
         @Volatile private var cloud = 0
+        @Volatile private var precip = 0.0
         @Volatile private var fahr = false
         @Volatile private var utcOff = 0
         @Volatile private var sunrise = 360
@@ -95,12 +96,12 @@ class WeatherWallpaperService : WallpaperService() {
         private var moonKey = -1
         private var flakeBmp: Bitmap? = null
         private var wispBmp: Bitmap? = null
-        private var dropBmp: Bitmap? = null
         private var dropBmp2: Bitmap? = null
-        private val spX = FloatArray(40)
-        private val spY = FloatArray(40)
-        private val spA = FloatArray(40) { 1f }
-        private val spS = FloatArray(40)
+        private val spn = 60
+        private val spX = FloatArray(spn)
+        private val spY = FloatArray(spn)
+        private val spA = FloatArray(spn) { 1f }
+        private val spS = FloatArray(spn)
         private var spI = 0
         private var skyShader: Shader? = null
         private var skyKey = -1L
@@ -136,13 +137,23 @@ class WeatherWallpaperService : WallpaperService() {
             else -> 6
         }
 
-        private fun rainN(): Int = when {
-            code in 51..57 -> 70
-            code == 61 || code == 80 -> 110
-            code == 63 || code == 81 -> 170
-            code == 65 || code == 66 || code == 67 || code == 82 -> 260
-            code >= 95 -> 270
-            else -> 150
+        // Intensitatea ploii in mm: cea reala daca exista, altfel estimata din cod
+        private fun intensity(): Float {
+            val mm = precip
+            if (mm > 0.05) return mm.toFloat()
+            return when {
+                code in 51..57 -> 0.3f
+                code == 61 || code == 80 -> 1.0f
+                code == 63 || code == 81 -> 3.0f
+                code == 65 || code == 66 || code == 67 || code == 82 -> 8.0f
+                code >= 95 -> 6.0f
+                else -> 2.0f
+            }
+        }
+
+        private fun rainN(): Int {
+            val i = intensity()
+            return (40f + 230f * (1f - exp(-i / 4f))).toInt()
         }
 
         private fun nowMin(): Int = (((System.currentTimeMillis() / 1000 + utcOff) / 60) % 1440).toInt()
@@ -192,7 +203,7 @@ class WeatherWallpaperService : WallpaperService() {
                 try {
                     val f = getSharedPreferences("app", MODE_PRIVATE).getString("units", "c") == "f"
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                        "&current=temperature_2m,weather_code,is_day,wind_speed_10m,cloud_cover" +
+                        "&current=temperature_2m,weather_code,is_day,wind_speed_10m,cloud_cover,precipitation" +
                         "&hourly=precipitation&daily=sunrise,sunset&past_days=1&forecast_days=1&timezone=auto" +
                         (if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else "")
                     val conn = URL(url).openConnection().apply { connectTimeout = 10000; readTimeout = 10000 }
@@ -222,6 +233,7 @@ class WeatherWallpaperService : WallpaperService() {
                     recentRain = rr
                     fahr = f
                     cloud = cur.optInt("cloud_cover", 0)
+                    precip = cur.optDouble("precipitation", 0.0)
                     code = cur.getInt("weather_code")
                     temp = cur.getDouble("temperature_2m")
                     wind = cur.getDouble("wind_speed_10m")
@@ -380,503 +392,4 @@ class WeatherWallpaperService : WallpaperService() {
             return bmp
         }
 
-        // Picatura mica, rotunjita, cu un punct luminos (desenata o singura data)
-        private fun dropBitmap(): Bitmap {
-            val old = dropBmp
-            if (old != null) return old
-            val bmp = Bitmap.createBitmap(20, 30, Bitmap.Config.ARGB_8888)
-            val cv = Canvas(bmp)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = LinearGradient(
-                0f, 2f, 0f, 28f,
-                Color.argb(0, 225, 238, 255), Color.argb(235, 225, 238, 255), Shader.TileMode.CLAMP
-            )
-            p.maskFilter = BlurMaskFilter(1.4f, BlurMaskFilter.Blur.NORMAL)
-            cv.drawOval(RectF(5f, 2f, 15f, 28f), p)
-            p.shader = null
-            p.maskFilter = null
-            p.color = Color.argb(210, 255, 255, 255)
-            cv.drawCircle(8.5f, 21f, 2.2f, p)
-            dropBmp = bmp
-            return bmp
-        }
-                private fun dropBitmap2(): Bitmap {
-            val old = dropBmp2
-            if (old != null) return old
-            val bmp = Bitmap.createBitmap(24, 40, Bitmap.Config.ARGB_8888)
-            val cv = Canvas(bmp)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            val path = Path()
-            path.moveTo(12f, 2f)
-            path.cubicTo(13f, 11f, 20f, 19f, 20f, 29f)
-            path.arcTo(RectF(4f, 21f, 20f, 37f), 0f, 180f)
-            path.cubicTo(4f, 19f, 11f, 11f, 12f, 2f)
-            path.close()
-            p.style = Paint.Style.FILL
-            p.shader = LinearGradient(
-                4f, 0f, 20f, 0f,
-                intArrayOf(Color.argb(150, 205, 225, 250), Color.argb(70, 205, 225, 250), Color.argb(170, 225, 238, 255)),
-                floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
-            )
-            cv.drawPath(path, p)
-            p.shader = null
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = 1.2f
-            p.color = Color.argb(200, 240, 247, 255)
-            cv.drawPath(path, p)
-            p.style = Paint.Style.FILL
-            p.color = Color.argb(230, 255, 255, 255)
-            cv.drawOval(RectF(7f, 25f, 11f, 31f), p)
-            dropBmp2 = bmp
-            return bmp
-        }
-        private fun wispBitmap(): Bitmap {
-            val old = wispBmp
-            if (old != null) return old
-            val bmp = Bitmap.createBitmap(400, 60, Bitmap.Config.ARGB_8888)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.color = Color.WHITE
-            p.maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
-            Canvas(bmp).drawRoundRect(RectF(50f, 23f, 350f, 37f), 8f, 8f, p)
-            wispBmp = bmp
-            return bmp
-        }
-
-        private fun moonPhase(): Float {
-            val days = (System.currentTimeMillis() / 1000.0 - 947182440.0) / 86400.0
-            val p = (days % 29.530588853) / 29.530588853
-            return (if (p < 0) p + 1 else p).toFloat()
-        }
-
-        private fun moonBitmap(phase: Float): Bitmap {
-            val key = (phase * 60).toInt()
-            val old = moonBmp
-            if (old != null && moonKey == key) return old
-            val n = 220
-            val px = IntArray(n * n)
-            val a = (2.0 * PI * phase.toDouble()).toFloat()
-            val lx = sin(a)
-            val lz = -cos(a)
-            for (j in 0 until n) {
-                for (i in 0 until n) {
-                    val x = (i + 0.5f) / n * 2f - 1f
-                    val y = (j + 0.5f) / n * 2f - 1f
-                    val r2 = x * x + y * y
-                    if (r2 >= 1f) continue
-                    val rr = sqrt(r2)
-                    val z = sqrt(max(0f, 1f - r2))
-                    val kLit = ((x * lx + z * lz + 0.04f) / 0.16f).coerceIn(0f, 1f)
-                    var alb = 0.92f
-                    for (m in MARIA) {
-                        val dx = x - m[0]
-                        val dy = y - m[1]
-                        alb -= m[3] * exp(-(dx * dx + dy * dy) / (m[2] * m[2]))
-                    }
-                    for (cr in CRATERS) {
-                        val d = sqrt((x - cr[0]) * (x - cr[0]) + (y - cr[1]) * (y - cr[1]))
-                        if (d < cr[2]) alb -= 0.05f * (1f - d / cr[2])
-                        if (abs(d - cr[2]) < 0.012f) alb += 0.08f
-                        if (cr[3] > 0f && d < cr[2] * 1.7f) alb += 0.16f * (1f - d / (cr[2] * 1.7f))
-                    }
-                    alb *= (0.78f + 0.22f * z)
-                    val lum = alb.coerceIn(0f, 1f) * (0.08f + 0.92f * kLit)
-                    val edge = ((1f - rr) / 0.025f).coerceIn(0f, 1f)
-                    val alpha = (edge * (0.2f + 0.8f * kLit) * 255f).toInt().coerceIn(0, 255)
-                    px[j * n + i] = Color.argb(
-                        alpha,
-                        (246f * lum).toInt().coerceIn(0, 255),
-                        (241f * lum).toInt().coerceIn(0, 255),
-                        (224f * lum).toInt().coerceIn(0, 255)
-                    )
-                }
-            }
-            val bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
-            bmp.setPixels(px, 0, n, 0, 0, n, n)
-            moonBmp = bmp
-            moonKey = key
-            return bmp
-        }
-
-        private fun makeBolt() {
-            bolt.clear()
-            bolt2.clear()
-            var x = w * (0.2f + 0.6f * rnd.nextFloat())
-            var y = 0f
-            bolt.add(PointF(x, y))
-            while (y < h * 0.55f) {
-                y += h * (0.03f + 0.04f * rnd.nextFloat())
-                x += (rnd.nextFloat() - 0.5f) * w * 0.12f
-                bolt.add(PointF(x, y))
-            }
-            val m = bolt[bolt.size / 2]
-            val dir = if (rnd.nextBoolean()) 1f else -1f
-            var bx = m.x
-            var by = m.y
-            bolt2.add(PointF(bx, by))
-            repeat(4) {
-                bx += dir * w * 0.05f * (0.5f + rnd.nextFloat())
-                by += h * 0.035f
-                bolt2.add(PointF(bx, by))
-            }
-        }
-
-        private fun render(c: Canvas) {
-            val k = cat()
-            val t = SystemClock.uptimeMillis() / 1000f
-            val pal = if (day) DAY else NIGHT
-            val sc = h / 1920f
-            val f = fahr
-            val tC = (if (f) (temp - 32.0) * 5.0 / 9.0 else temp).toFloat()
-            val windKmh = (if (f) wind * 1.609 else wind).toFloat()
-            val heavySnow = code == 75 || code == 86
-
-            // cer cu degrade fin (creat o singura data)
-            val top = pal[k * 2]
-            val bot = pal[k * 2 + 1]
-            val skK = (k * 2 + (if (day) 1 else 0)).toLong() * 100000000L + w.toLong() * 10000L + h.toLong()
-            if (skyShader == null || skyKey != skK) {
-                skyShader = LinearGradient(
-                    0f, 0f, 0f, h,
-                    intArrayOf(top, blend(top, bot, 0.35f), blend(top, bot, 0.8f), mixWhite(bot, 0.12f)),
-                    floatArrayOf(0f, 0.4f, 0.75f, 1f), Shader.TileMode.CLAMP
-                )
-                skyKey = skK
-            }
-            paint.shader = skyShader
-            c.drawPaint(paint)
-            paint.shader = null
-
-            // nuanta dupa temperatura
-            if (tC < 15f) {
-                c.drawColor(Color.argb(((15f - max(tC, -10f)) / 25f * 80).toInt(), 120, 170, 255))
-            } else {
-                c.drawColor(Color.argb(((min(tC, 38f) - 15f) / 23f * 90).toInt(), 255, 130, 50))
-            }
-
-            // pozitia soarelui + stralucire la rasarit/apus
-            val now = nowMin()
-            val span = max(1, sunset - sunrise)
-            val frac = (now - sunrise).toFloat() / span
-            var sx = w * 0.78f
-            var sy = h * 0.14f
-            if (day && frac in 0f..1f) {
-                sx = w * (0.12f + 0.76f * frac)
-                sy = h * (0.34f - 0.22f * sin((PI * frac).toFloat()))
-            }
-            val dist = min(abs(now - sunrise), abs(now - sunset))
-            if (k <= 2 && dist < 50) {
-                val a = 1f - dist / 50f
-                paint.shader = LinearGradient(
-                    0f, h * 0.35f, 0f, h,
-                    Color.argb(0, 255, 110, 60), Color.argb((a * 150).toInt(), 255, 110, 60), Shader.TileMode.CLAMP
-                )
-                c.drawRect(0f, h * 0.35f, w, h, paint)
-                paint.shader = null
-            }
-
-            // soare / luna + stele
-            if (k <= 1) {
-                if (day) {
-                    val warm = (1f - dist / 90f).coerceIn(0f, 1f)
-                    val r = w * 0.085f * (1f + 0.4f * warm)
-                    val halo = blend(0xFFFFF3B0.toInt(), 0xFFFF9A5A.toInt(), warm)
-                    val hrad = w * 0.62f * (1f + 0.03f * sin(t))
-                    paint.shader = RadialGradient(
-                        sx, sy, hrad,
-                        intArrayOf(
-                            Color.argb(170, Color.red(halo), Color.green(halo), Color.blue(halo)),
-                            Color.argb(60, Color.red(halo), Color.green(halo), Color.blue(halo)), 0
-                        ),
-                        floatArrayOf(0f, .3f, 1f), Shader.TileMode.CLAMP
-                    )
-                    c.drawCircle(sx, sy, hrad, paint)
-                    paint.shader = null
-                    // raze scurte
-                    sp.strokeWidth = w * 0.012f
-                    for (i in 0 until 14) {
-                        val a = t * 0.04f + i * (2f * PI.toFloat() / 14f)
-                        val len = if (i % 2 == 0) 2.6f else 2.0f
-                        sp.color = Color.argb(if (i % 2 == 0) 42 else 26, 255, 244, 190)
-                        c.drawLine(sx + cos(a) * r * 1.4f, sy + sin(a) * r * 1.4f, sx + cos(a) * r * len, sy + sin(a) * r * len, sp)
-                    }
-                    paint.shader = RadialGradient(
-                        sx - r * .3f, sy - r * .3f, r * 1.35f,
-                        intArrayOf(
-                            0xFFFFFFF0.toInt(),
-                            blend(0xFFFFE680.toInt(), 0xFFFF8A3D.toInt(), warm),
-                            blend(0xFFFFC43D.toInt(), 0xFFE8431C.toInt(), warm)
-                        ),
-                        floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP
-                    )
-                    c.drawCircle(sx, sy, r, paint)
-                    paint.shader = null
-                } else {
-                    // Calea Lactee
-                    c.save()
-                    c.rotate(-28f, w / 2f, h * 0.3f)
-                    paint.shader = LinearGradient(
-                        0f, h * 0.12f, 0f, h * 0.30f,
-                        intArrayOf(0, Color.argb(34, 200, 210, 255), 0),
-                        floatArrayOf(0f, .5f, 1f), Shader.TileMode.CLAMP
-                    )
-                    c.drawRect(-w * 0.3f, h * 0.12f, w * 1.3f, h * 0.30f, paint)
-                    paint.shader = null
-                    c.restore()
-                    for (i in 0 until 140) {
-                        val x = ((i * 7919) % 1000) / 1000f * w
-                        val y = ((i * 104729) % 1000) / 1000f * h * 0.62f
-                        val big = i % 9 == 0
-                        val tw = 0.5f + 0.5f * sin(t * (1.2f + (i % 5) * 0.4f) + i)
-                        paint.color = Color.argb((80 + 160 * tw).toInt(), 255, if (i % 4 == 0) 232 else 255, if (i % 7 == 0) 205 else 255)
-                        c.drawCircle(x, y, (0.7f + (i % 3) * 0.6f + (if (big) 0.9f else 0f)) * (0.8f + 0.4f * tw), paint)
-                        if (big) {
-                            sp.color = Color.argb((70 * tw).toInt(), 255, 255, 255)
-                            sp.strokeWidth = 1.5f
-                            val l = 7f + 6f * tw
-                            c.drawLine(x - l, y, x + l, y, sp)
-                            c.drawLine(x, y - l, x, y + l, sp)
-                        }
-                    }
-                    // stea cazatoare la ~40 de secunde
-                    val cyc = t % 40f
-                    if (cyc < 1f) {
-                        val n = (t / 40f).toInt()
-                        val x0 = w * (0.35f + 0.55f * (((n * 7919) % 1000) / 1000f))
-                        val y0 = h * (0.04f + 0.2f * (((n * 104729) % 1000) / 1000f))
-                        val hx = x0 - cyc * w * 0.3f
-                        val hy = y0 + cyc * h * 0.08f
-                        sp.strokeWidth = 3f
-                        sp.color = Color.argb(((1f - cyc) * 230).toInt(), 255, 255, 255)
-                        c.drawLine(hx, hy, hx + w * 0.07f, hy - h * 0.018f, sp)
-                    }
-                    val ph = moonPhase()
-                    val mb = moonBitmap(ph)
-                    val mr = w * 0.075f
-                    val illum = (1f - cos((2.0 * PI * ph.toDouble()).toFloat())) / 2f
-                    paint.shader = RadialGradient(
-                        sx, sy, mr * 4.5f,
-                        intArrayOf(Color.argb((70 * illum).toInt(), 220, 230, 255), 0),
-                        floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
-                    )
-                    c.drawCircle(sx, sy, mr * 4.5f, paint)
-                    paint.shader = null
-                    c.save()
-                    c.rotate(-18f, sx, sy)
-                    rect.set(sx - mr, sy - mr, sx + mr, sy + mr)
-                    c.drawBitmap(mb, null, rect, paint)
-                    c.restore()
-                }
-            }
-
-            // curcubeu dupa ploaie
-            if (day && k <= 2 && recentRain > 0.3) {
-                sp.strokeWidth = w * 0.02f
-                val cx = w * 0.4f
-                val cy = h * 0.72f
-                for (i in RB.indices) {
-                    val r = w * 0.62f - i * w * 0.02f
-                    sp.color = (RB[i] and 0x00FFFFFF) or (0x55 shl 24)
-                    c.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), 180f, 180f, false, sp)
-                }
-            }
-
-            // nori pufosi, mici si putini
-            val cloudCol = when {
-                k == 6 -> Color.argb(190, 40, 46, 62)
-                k >= 4 -> Color.argb(170, 90, 104, 120)
-                !day -> Color.argb(120, 150, 160, 185)
-                else -> Color.argb(190, 255, 255, 255)
-            }
-            val cbmp = cloudBitmap(cloudCol)
-            val tintA = if (day && dist < 50) ((1f - dist / 50f) * 90f).toInt() else 0
-            paint.colorFilter = if (tintA > 0) PorterDuffColorFilter(Color.argb(tintA, 255, 140, 80), PorterDuff.Mode.SRC_ATOP) else null
-            for (cl in clouds) {
-                val bw = 120f * cl.s * (w / 1080f)
-                val bh = bw * 240f / 440f
-                cl.x += cl.v * dtf
-                if (cl.x > w) cl.x = -bw
-                paint.alpha = (Color.alpha(cloudCol) * (0.55f + min(cl.s, 2f) * 0.22f)).toInt().coerceIn(0, 255)
-                rect.set(cl.x, cl.y, cl.x + bw, cl.y + bh)
-                c.drawBitmap(cbmp, null, rect, paint)
-            }
-            paint.colorFilter = null
-            paint.alpha = 255
-
-            // ceata: val usor si fasii subtiri, scurte
-            if (k == 3) {
-                c.drawColor(Color.argb(45, 235, 240, 245))
-                val wb = wispBitmap()
-                for (p in wisps) {
-                    val bw = w * (0.22f + 0.28f * p.s)
-                    val bh = bw * 60f / 400f
-                    p.x += p.v * (w / 1080f) * dtf
-                    if (p.x > w) p.x = -bw
-                    paint.alpha = (35 + 45 * p.s).toInt()
-                    rect.set(p.x, p.y, p.x + bw, p.y + bh)
-                    c.drawBitmap(wb, null, rect, paint)
-                }
-                paint.alpha = 255
-            }
-
-            val slant = min(windKmh, 40f) / 40f * 10f + (if (heavySnow) 4f else 0f)
-                        // ploaie / burnita / furtuna: picaturi in forma de lacrima + stropi
-            if (k == 4 || k == 6) {
-                val light = code in 51..57
-                val fl = if (light) 0.6f else 1f
-                val lt = if (light) 0.85f else 1f
-                val db = dropBitmap2()
-                val us = w / 1080f
-                for (p in parts) {
-                    val d = p.s
-                    val land = h * (0.88f + 0.11f * d)
-                    p.y += p.v * sc * fl * (0.6f + 0.8f * d) * dtf
-                    p.x += slant * sc * (0.6f + 0.8f * d) * dtf
-                    if (p.y > land) {
-                        if (d > 0.25f && rnd.nextFloat() < 0.7f) {
-                            spX[spI] = p.x
-                            spY[spI] = land
-                            spA[spI] = 0f
-                            spS[spI] = 0.6f + 0.8f * d
-                            spI = (spI + 1) % 40
-                        }
-                        p.y = -40f
-                        p.x = rnd.nextFloat() * w
-                    }
-                    if (p.x > w) p.x -= w
-                    val bh = (12f + 20f * d) * us * lt
-                    val dh = bh * (1f + 0.45f * d)
-                    val dw = bh * 0.55f * (1f - 0.18f * d)
-                    val ang = -atan(slant / (p.v * fl)) * 57.2958f
-                    paint.alpha = ((90 + 140 * d) * lt).toInt()
-                    c.save()
-                    c.rotate(ang, p.x, p.y)
-                    rect.set(p.x - dw / 2f, p.y - dh, p.x + dw / 2f, p.y)
-                    c.drawBitmap(db, null, rect, paint)
-                    c.restore()
-                }
-                paint.alpha = 255
-                // stropi la impact
-                sp.strokeWidth = max(1f, 1.6f * us)
-                for (i in 0 until 40) {
-                    val a = spA[i]
-                    if (a >= 1f) continue
-                    val s = spS[i]
-                    val ring = (5f + 16f * a) * us * s
-                    val fade = 1f - a
-                    sp.color = Color.argb((140 * fade).toInt(), 225, 238, 255)
-                    rect.set(spX[i] - ring, spY[i] - ring * 0.28f, spX[i] + ring, spY[i] + ring * 0.28f)
-                    c.drawOval(rect, sp)
-                    paint.color = Color.argb((210 * fade).toInt(), 235, 245, 255)
-                    for (j in 0 until 4) {
-                        val dir = (j - 1.5f) * 0.7f
-                        val px = spX[i] + dir * a * 22f * us * s
-                        val py = spY[i] - sin((PI * a).toFloat()) * (10f + 4f * j) * us * s
-                        c.drawCircle(px, py, max(1f, 1.7f * us * s * (1f - 0.5f * a)), paint)
-                    }
-                    spA[i] = a + 0.045f * dtf
-                }
-                paint.shader = LinearGradient(
-                    0f, h * 0.82f, 0f, h,
-                    Color.argb(0, 200, 215, 235), Color.argb(if (k == 6 || code >= 65) 70 else 40, 200, 215, 235), Shader.TileMode.CLAMP
-                )
-                c.drawRect(0f, h * 0.82f, w, h, paint)
-                paint.shader = null
-            }
-          
-
-            // grindina
-            if (hail.isNotEmpty()) {
-                for (p in hail) {
-                    p.y += p.v * sc * dtf
-                    p.x += slant * sc * dtf
-                    if (p.y > h) { p.y = -20f; p.x = rnd.nextFloat() * w }
-                    if (p.x > w) p.x -= w
-                    val r = max(2f, p.s * sc * 1.8f)
-                    paint.color = Color.argb(235, 225, 236, 248)
-                    c.drawCircle(p.x, p.y, r, paint)
-                    paint.color = Color.argb(200, 255, 255, 255)
-                    c.drawCircle(p.x - r * 0.3f, p.y - r * 0.3f, r * 0.4f, paint)
-                }
-            }
-
-            // ninsoare
-            if (k == 5) {
-                if (heavySnow) c.drawColor(Color.argb(55, 255, 255, 255))
-                val fb = flakeBitmap()
-                for (p in parts) {
-                    val d = p.s
-                    p.y += p.v * sc * 1.6f * dtf
-                    p.x += (sin(t * (0.7f + d * 0.5f) + p.v * 9f) * 0.9f * (0.5f + d) + slant * sc * 0.3f * (0.5f + d)) * dtf
-                    if (p.y > h) { p.y = -30f; p.x = rnd.nextFloat() * w }
-                    if (p.x > w) p.x -= w
-                    if (p.x < 0f) p.x += w
-                    val size = (6f + 20f * d) * sc * 1.8f
-                    paint.alpha = (110 + 120 * d).toInt()
-                    rect.set(p.x - size / 2f, p.y - size / 2f, p.x + size / 2f, p.y + size / 2f)
-                    c.drawBitmap(fb, null, rect, paint)
-                }
-                paint.alpha = 255
-                paint.shader = LinearGradient(
-                    0f, h * 0.9f, 0f, h,
-                    Color.argb(0, 255, 255, 255), Color.argb(70, 255, 255, 255), Shader.TileMode.CLAMP
-                )
-                c.drawRect(0f, h * 0.9f, w, h, paint)
-                paint.shader = null
-            }
-
-            // fulgere cu ramura
-            if (k == 6) {
-                val nowMs = SystemClock.uptimeMillis()
-                if (nowMs > nextBolt) {
-                    nextBolt = nowMs + 2500 + rnd.nextInt(6000)
-                    flash = 1f
-                    boltUntil = nowMs + 230
-                    makeBolt()
-                }
-                if (nowMs < boltUntil && bolt.size > 1) {
-                    val path = Path()
-                    path.moveTo(bolt[0].x, bolt[0].y)
-                    for (i in 1 until bolt.size) path.lineTo(bolt[i].x, bolt[i].y)
-                    sp.color = Color.argb(90, 190, 210, 255)
-                    sp.strokeWidth = w / 50f
-                    c.drawPath(path, sp)
-                    sp.color = Color.WHITE
-                    sp.strokeWidth = w / 140f
-                    c.drawPath(path, sp)
-                    if (bolt2.size > 1) {
-                        val br = Path()
-                        br.moveTo(bolt2[0].x, bolt2[0].y)
-                        for (i in 1 until bolt2.size) br.lineTo(bolt2[i].x, bolt2[i].y)
-                        sp.strokeWidth = w / 260f
-                        c.drawPath(br, sp)
-                    }
-                }
-                if (flash > 0.02f) {
-                    c.drawColor(Color.argb((flash * 140).toInt(), 255, 255, 255))
-                    flash *= 0.82f.pow(dtf)
-                }
-            }
-
-            // vigneta fina (creata o singura data)
-            val vk = w.toLong() * 10000L + h.toLong()
-            if (vigShader == null || vigKey != vk) {
-                vigShader = RadialGradient(
-                    w / 2f, h * 0.45f, h * 0.75f,
-                    intArrayOf(0, 0, Color.argb(70, 0, 0, 0)),
-                    floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP
-                )
-                vigKey = vk
-            }
-            paint.shader = vigShader
-            c.drawRect(0f, 0f, w, h, paint)
-            paint.shader = null
-
-            // temperatura
-            paint.color = Color.argb(190, 255, 255, 255)
-            paint.textAlign = Paint.Align.CENTER
-            paint.textSize = w * 0.10f
-            paint.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            c.drawText("${temp.roundToInt()}°" + (if (f) "F" else ""), w / 2f, h * 0.86f, paint)
-        }
-    }
-}
+        // Picatura
