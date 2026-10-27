@@ -696,8 +696,8 @@ class WeatherWallpaperService : WallpaperService() {
                     p.x += slant * sc * (0.6f + 0.8f * d) * dtf
                     if (p.y > h) { p.y = -40f; p.x = rnd.nextFloat() * w }
                     if (p.x > w) p.x -= w
-                    val dh = (9f + 15f * d) * us * (if (light) 0.8f else 1f)
-                    val dw = dh * 0.5f
+                    val dh = (12f + 20f * d) * us * (if (light) 0.85f else 1f)
+                    val dw = dh * 0.55f
                     paint.alpha = ((70 + 130 * d) * (if (light) 0.8f else 1f)).toInt()
                     rect.set(p.x - dw / 2f, p.y - dh, p.x + dw / 2f, p.y)
                     c.drawBitmap(db, null, rect, paint)
