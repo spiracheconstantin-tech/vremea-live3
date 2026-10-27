@@ -73,6 +73,7 @@ class WeatherWallpaperService : WallpaperService() {
         @Volatile private var code = 0
         @Volatile private var temp = 15.0
         @Volatile private var wind = 5.0
+        @Volatile private var windDir = 270.0
         @Volatile private var day = true
         @Volatile private var cloud = 0
         @Volatile private var precip = 0.0
@@ -137,7 +138,6 @@ class WeatherWallpaperService : WallpaperService() {
             else -> 6
         }
 
-        // Intensitatea ploii in mm: cea reala daca exista, altfel estimata din cod
         private fun intensity(): Float {
             val mm = precip
             if (mm > 0.05) return mm.toFloat()
@@ -203,7 +203,7 @@ class WeatherWallpaperService : WallpaperService() {
                 try {
                     val f = getSharedPreferences("app", MODE_PRIVATE).getString("units", "c") == "f"
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                        "&current=temperature_2m,weather_code,is_day,wind_speed_10m,cloud_cover,precipitation" +
+                        "&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,cloud_cover,precipitation" +
                         "&hourly=precipitation&daily=sunrise,sunset&past_days=1&forecast_days=1&timezone=auto" +
                         (if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else "")
                     val conn = URL(url).openConnection().apply { connectTimeout = 10000; readTimeout = 10000 }
@@ -237,6 +237,7 @@ class WeatherWallpaperService : WallpaperService() {
                     code = cur.getInt("weather_code")
                     temp = cur.getDouble("temperature_2m")
                     wind = cur.getDouble("wind_speed_10m")
+                    windDir = cur.optDouble("wind_direction_10m", 270.0)
                     day = cur.getInt("is_day") == 1
                     handler.post { init() }
                 } catch (e: Exception) {
@@ -392,7 +393,6 @@ class WeatherWallpaperService : WallpaperService() {
             return bmp
         }
 
-        // Picatura in forma de lacrima (desenata o singura data)
         private fun dropBitmap2(): Bitmap {
             val old = dropBmp2
             if (old != null) return old
@@ -490,8 +490,7 @@ class WeatherWallpaperService : WallpaperService() {
             moonKey = key
             return bmp
         }
-
-        private fun makeBolt() {
+                private fun makeBolt() {
             bolt.clear()
             bolt2.clear()
             var x = w * (0.2f + 0.6f * rnd.nextFloat())
@@ -523,6 +522,12 @@ class WeatherWallpaperService : WallpaperService() {
             val tC = (if (f) (temp - 32.0) * 5.0 / 9.0 else temp).toFloat()
             val windKmh = (if (f) wind * 1.609 else wind).toFloat()
             val heavySnow = code == 75 || code == 86
+
+            // directia vantului: spre dreapta sau spre stanga
+            val wr = Math.toRadians(windDir).toFloat()
+            val hx0 = -sin(wr)
+            val hx = if (abs(hx0) < 0.2f) (if (hx0 < 0f) -0.2f else 0.2f) else hx0
+            val wspd = min(windKmh, 40f) / 40f
 
             // cer cu degrade fin (creat o singura data)
             val top = pal[k * 2]
@@ -585,7 +590,6 @@ class WeatherWallpaperService : WallpaperService() {
                     )
                     c.drawCircle(sx, sy, hrad, paint)
                     paint.shader = null
-                    // raze scurte
                     sp.strokeWidth = w * 0.012f
                     for (i in 0 until 14) {
                         val a = t * 0.04f + i * (2f * PI.toFloat() / 14f)
@@ -637,11 +641,11 @@ class WeatherWallpaperService : WallpaperService() {
                         val n = (t / 40f).toInt()
                         val x0 = w * (0.35f + 0.55f * (((n * 7919) % 1000) / 1000f))
                         val y0 = h * (0.04f + 0.2f * (((n * 104729) % 1000) / 1000f))
-                        val hx = x0 - cyc * w * 0.3f
-                        val hy = y0 + cyc * h * 0.08f
+                        val stx = x0 - cyc * w * 0.3f
+                        val sty = y0 + cyc * h * 0.08f
                         sp.strokeWidth = 3f
                         sp.color = Color.argb(((1f - cyc) * 230).toInt(), 255, 255, 255)
-                        c.drawLine(hx, hy, hx + w * 0.07f, hy - h * 0.018f, sp)
+                        c.drawLine(stx, sty, stx + w * 0.07f, sty - h * 0.018f, sp)
                     }
                     val ph = moonPhase()
                     val mb = moonBitmap(ph)
@@ -674,7 +678,7 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            // nori pufosi, mici si putini
+            // nori pufosi, mici si putini, miscati dupa vant
             val cloudCol = when {
                 k == 6 -> Color.argb(190, 40, 46, 62)
                 k >= 4 -> Color.argb(170, 90, 104, 120)
@@ -687,8 +691,9 @@ class WeatherWallpaperService : WallpaperService() {
             for (cl in clouds) {
                 val bw = 120f * cl.s * (w / 1080f)
                 val bh = bw * 240f / 440f
-                cl.x += cl.v * dtf
+                cl.x += cl.v * (0.8f + wspd * 3f) * hx * dtf
                 if (cl.x > w) cl.x = -bw
+                if (cl.x < -bw) cl.x = w
                 paint.alpha = (Color.alpha(cloudCol) * (0.55f + min(cl.s, 2f) * 0.22f)).toInt().coerceIn(0, 255)
                 rect.set(cl.x, cl.y, cl.x + bw, cl.y + bh)
                 c.drawBitmap(cbmp, null, rect, paint)
@@ -703,8 +708,9 @@ class WeatherWallpaperService : WallpaperService() {
                 for (p in wisps) {
                     val bw = w * (0.22f + 0.28f * p.s)
                     val bh = bw * 60f / 400f
-                    p.x += p.v * (w / 1080f) * dtf
+                    p.x += p.v * (0.8f + wspd * 2.5f) * hx * (w / 1080f) * dtf
                     if (p.x > w) p.x = -bw
+                    if (p.x < -bw) p.x = w
                     paint.alpha = (35 + 45 * p.s).toInt()
                     rect.set(p.x, p.y, p.x + bw, p.y + bh)
                     c.drawBitmap(wb, null, rect, paint)
@@ -712,7 +718,7 @@ class WeatherWallpaperService : WallpaperService() {
                 paint.alpha = 255
             }
 
-            val slant = min(windKmh, 40f) / 40f * 10f + (if (heavySnow) 4f else 0f)
+            val slant = (wspd * 10f + (if (heavySnow) 4f else 0f)) * hx
 
             // ploaie / burnita / furtuna: picaturi in forma de lacrima + stropi
             if (k == 4 || k == 6) {
@@ -742,6 +748,7 @@ class WeatherWallpaperService : WallpaperService() {
                         p.x = rnd.nextFloat() * w
                     }
                     if (p.x > w) p.x -= w
+                    if (p.x < 0f) p.x += w
                     val bh = (12f + 20f * d) * us * lt * szm
                     val dh = bh * (1f + 0.45f * d)
                     val dw = bh * 0.55f * (1f - 0.18f * d)
@@ -789,6 +796,7 @@ class WeatherWallpaperService : WallpaperService() {
                     p.x += slant * sc * dtf
                     if (p.y > h) { p.y = -20f; p.x = rnd.nextFloat() * w }
                     if (p.x > w) p.x -= w
+                    if (p.x < 0f) p.x += w
                     val r = max(2f, p.s * sc * 1.8f)
                     paint.color = Color.argb(235, 225, 236, 248)
                     c.drawCircle(p.x, p.y, r, paint)
@@ -868,13 +876,6 @@ class WeatherWallpaperService : WallpaperService() {
             paint.shader = vigShader
             c.drawRect(0f, 0f, w, h, paint)
             paint.shader = null
-
-            // temperatura
-            paint.color = Color.argb(190, 255, 255, 255)
-            paint.textAlign = Paint.Align.CENTER
-            paint.textSize = w * 0.10f
-            paint.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            c.drawText("${temp.roundToInt()}°" + (if (f) "F" else ""), w / 2f, h * 0.86f, paint)
         }
     }
 }
