@@ -17,6 +17,7 @@ import org.json.JSONObject
 import java.net.URL
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
@@ -95,6 +96,12 @@ class WeatherWallpaperService : WallpaperService() {
         private var flakeBmp: Bitmap? = null
         private var wispBmp: Bitmap? = null
         private var dropBmp: Bitmap? = null
+        private var dropBmp2: Bitmap? = null
+        private val spX = FloatArray(40)
+        private val spY = FloatArray(40)
+        private val spA = FloatArray(40) { 1f }
+        private val spS = FloatArray(40)
+        private var spI = 0
         private var skyShader: Shader? = null
         private var skyKey = -1L
         private var vigShader: Shader? = null
@@ -393,7 +400,36 @@ class WeatherWallpaperService : WallpaperService() {
             dropBmp = bmp
             return bmp
         }
-
+                private fun dropBitmap2(): Bitmap {
+            val old = dropBmp2
+            if (old != null) return old
+            val bmp = Bitmap.createBitmap(24, 40, Bitmap.Config.ARGB_8888)
+            val cv = Canvas(bmp)
+            val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            val path = Path()
+            path.moveTo(12f, 2f)
+            path.cubicTo(13f, 11f, 20f, 19f, 20f, 29f)
+            path.arcTo(RectF(4f, 21f, 20f, 37f), 0f, 180f)
+            path.cubicTo(4f, 19f, 11f, 11f, 12f, 2f)
+            path.close()
+            p.style = Paint.Style.FILL
+            p.shader = LinearGradient(
+                4f, 0f, 20f, 0f,
+                intArrayOf(Color.argb(150, 205, 225, 250), Color.argb(70, 205, 225, 250), Color.argb(170, 225, 238, 255)),
+                floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
+            )
+            cv.drawPath(path, p)
+            p.shader = null
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = 1.2f
+            p.color = Color.argb(200, 240, 247, 255)
+            cv.drawPath(path, p)
+            p.style = Paint.Style.FILL
+            p.color = Color.argb(230, 255, 255, 255)
+            cv.drawOval(RectF(7f, 25f, 11f, 31f), p)
+            dropBmp2 = bmp
+            return bmp
+        }
         private fun wispBitmap(): Bitmap {
             val old = wispBmp
             if (old != null) return old
@@ -683,26 +719,62 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             val slant = min(windKmh, 40f) / 40f * 10f + (if (heavySnow) 4f else 0f)
-
-            // ploaie / burnita / furtuna: picaturi mici
+                        // ploaie / burnita / furtuna: picaturi in forma de lacrima + stropi
             if (k == 4 || k == 6) {
                 val light = code in 51..57
                 val fl = if (light) 0.6f else 1f
-                val db = dropBitmap()
+                val lt = if (light) 0.85f else 1f
+                val db = dropBitmap2()
                 val us = w / 1080f
                 for (p in parts) {
                     val d = p.s
+                    val land = h * (0.88f + 0.11f * d)
                     p.y += p.v * sc * fl * (0.6f + 0.8f * d) * dtf
                     p.x += slant * sc * (0.6f + 0.8f * d) * dtf
-                    if (p.y > h) { p.y = -40f; p.x = rnd.nextFloat() * w }
+                    if (p.y > land) {
+                        if (d > 0.25f && rnd.nextFloat() < 0.7f) {
+                            spX[spI] = p.x
+                            spY[spI] = land
+                            spA[spI] = 0f
+                            spS[spI] = 0.6f + 0.8f * d
+                            spI = (spI + 1) % 40
+                        }
+                        p.y = -40f
+                        p.x = rnd.nextFloat() * w
+                    }
                     if (p.x > w) p.x -= w
-                    val dh = (12f + 20f * d) * us * (if (light) 0.85f else 1f)
-                    val dw = dh * 0.55f
-                    paint.alpha = ((70 + 130 * d) * (if (light) 0.8f else 1f)).toInt()
+                    val bh = (12f + 20f * d) * us * lt
+                    val dh = bh * (1f + 0.45f * d)
+                    val dw = bh * 0.55f * (1f - 0.18f * d)
+                    val ang = -atan(slant / (p.v * fl)) * 57.2958f
+                    paint.alpha = ((90 + 140 * d) * lt).toInt()
+                    c.save()
+                    c.rotate(ang, p.x, p.y)
                     rect.set(p.x - dw / 2f, p.y - dh, p.x + dw / 2f, p.y)
                     c.drawBitmap(db, null, rect, paint)
+                    c.restore()
                 }
                 paint.alpha = 255
+                // stropi la impact
+                sp.strokeWidth = max(1f, 1.6f * us)
+                for (i in 0 until 40) {
+                    val a = spA[i]
+                    if (a >= 1f) continue
+                    val s = spS[i]
+                    val ring = (5f + 16f * a) * us * s
+                    val fade = 1f - a
+                    sp.color = Color.argb((140 * fade).toInt(), 225, 238, 255)
+                    rect.set(spX[i] - ring, spY[i] - ring * 0.28f, spX[i] + ring, spY[i] + ring * 0.28f)
+                    c.drawOval(rect, sp)
+                    paint.color = Color.argb((210 * fade).toInt(), 235, 245, 255)
+                    for (j in 0 until 4) {
+                        val dir = (j - 1.5f) * 0.7f
+                        val px = spX[i] + dir * a * 22f * us * s
+                        val py = spY[i] - sin((PI * a).toFloat()) * (10f + 4f * j) * us * s
+                        c.drawCircle(px, py, max(1f, 1.7f * us * s * (1f - 0.5f * a)), paint)
+                    }
+                    spA[i] = a + 0.045f * dtf
+                }
                 paint.shader = LinearGradient(
                     0f, h * 0.82f, 0f, h,
                     Color.argb(0, 200, 215, 235), Color.argb(if (k == 6 || code >= 65) 70 else 40, 200, 215, 235), Shader.TileMode.CLAMP
@@ -710,6 +782,7 @@ class WeatherWallpaperService : WallpaperService() {
                 c.drawRect(0f, h * 0.82f, w, h, paint)
                 paint.shader = null
             }
+          
 
             // grindina
             if (hail.isNotEmpty()) {
