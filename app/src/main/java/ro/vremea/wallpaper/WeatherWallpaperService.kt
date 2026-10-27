@@ -514,6 +514,10 @@ class WeatherWallpaperService : WallpaperService() {
         }
 
         private fun render(c: Canvas) {
+                        paint.reset()
+            paint.isAntiAlias = true
+            paint.isFilterBitmap = true
+            paint.isDither = true
             val k = cat()
             val t = SystemClock.uptimeMillis() / 1000f
             val pal = if (day) DAY else NIGHT
@@ -647,6 +651,7 @@ class WeatherWallpaperService : WallpaperService() {
                         sp.color = Color.argb(((1f - cyc) * 230).toInt(), 255, 255, 255)
                         c.drawLine(stx, sty, stx + w * 0.07f, sty - h * 0.018f, sp)
                     }
+                    paint.alpha = 255
                     val ph = moonPhase()
                     val mb = moonBitmap(ph)
                     val mr = w * 0.075f
@@ -781,6 +786,7 @@ class WeatherWallpaperService : WallpaperService() {
                     }
                     spA[i] = a + 0.045f * dtf
                 }
+                paint.alpha = 255
                 paint.shader = LinearGradient(
                     0f, h * 0.82f, 0f, h,
                     Color.argb(0, 200, 215, 235), Color.argb((25f + 55f * lvl).toInt(), 200, 215, 235), Shader.TileMode.CLAMP
@@ -873,6 +879,7 @@ class WeatherWallpaperService : WallpaperService() {
                 )
                 vigKey = vk
             }
+            paint.alpha = 255
             paint.shader = vigShader
             c.drawRect(0f, 0f, w, h, paint)
             paint.shader = null
