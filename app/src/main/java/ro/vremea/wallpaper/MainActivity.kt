@@ -132,6 +132,7 @@ class MainActivity : Activity() {
             false
         }
         scroll.addView(body)
+                attachPull(this, scroll) { load() }
         root.addView(top)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
         setContentView(root)
@@ -168,6 +169,8 @@ class MainActivity : Activity() {
         m.menu.add(0, 6, 5, "🔄 Reîmprospătează")
         m.menu.add(0, 7, 6, "🖼️ Setează fundal animat")
         m.menu.add(0, 8, 7, "📡 Sursă date: " + srcName() + " (schimbă)")
+                m.menu.add(0, 9, 8, "⚙️ Setări fundal animat")
+        m.menu.add(0, 10, 9, "🔔 Alerte vreme periculoasă: " + (if (prefs.getBoolean("alerts", false)) "pornite" else "oprite"))
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -178,6 +181,8 @@ class MainActivity : Activity() {
                 6 -> load()
                 7 -> openChooser()
                 8 -> pickSource()
+                9 -> wallpaperSettings(this)
+                10 -> toggleAlerts(this)
             }
             true
         }
@@ -603,6 +608,7 @@ class MainActivity : Activity() {
         hs.addView(hl)
         hp.addView(hs)
         add(hp, 12)
+        addChart(this, body, j)
 
         // 7 zile
         val dpn = panel()
@@ -622,6 +628,7 @@ class MainActivity : Activity() {
             dpn.addView(row)
         }
         add(dpn, 12)
+        addAir(this, body, prefs.getString("lat", "") ?: "", prefs.getString("lon", "") ?: "")
         add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
