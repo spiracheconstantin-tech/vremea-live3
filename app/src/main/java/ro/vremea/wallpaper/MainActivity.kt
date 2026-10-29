@@ -120,6 +120,17 @@ class MainActivity : Activity() {
             setPadding(dp(16), 0, dp(16), dp(32))
         }
         val scroll = ScrollView(this)
+        var pullStartY = 0f
+        scroll.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> pullStartY = event.y
+                android.view.MotionEvent.ACTION_UP -> {
+                    val pulledDown = event.y - pullStartY
+                    if (view.scrollY == 0 && pulledDown > dp(90)) load()
+                }
+            }
+            false
+        }
         scroll.addView(body)
         root.addView(top)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
