@@ -119,6 +119,10 @@ class WeatherWallpaperService : WallpaperService() {
         private var rayKey = -1L
         private var lastMs = 0L
         private var dtf = 1f
+        private var qMul = 1f
+        private var frameMs = 16L
+        private var showStars = true
+        private var showHillsV = true
         private var tiltX = 0f
         private var tiltY = 0f
         private var tgX = 0f
@@ -138,7 +142,7 @@ class WeatherWallpaperService : WallpaperService() {
                 draw()
                 if (visible) {
                     val used = SystemClock.uptimeMillis() - s
-                    handler.postDelayed(this, max(1L, 16L - used))
+                    handler.postDelayed(this, max(1L, frameMs - used))
                 }
             }
         }
@@ -187,13 +191,19 @@ class WeatherWallpaperService : WallpaperService() {
         private fun init() {
             val k = cat()
             val heavy = code == 75 || code == 86
+                        val ap0 = getSharedPreferences("app", MODE_PRIVATE)
+            val ql = ap0.getString("wp_quality", "normal")
+            qMul = if (ql == "eco") 0.5f else if (ql == "max") 1.3f else 1f
+            frameMs = if (ql == "eco") 33L else 16L
+            showStars = ap0.getBoolean("wp_stars", true)
+            showHillsV = ap0.getBoolean("wp_hills", true)
             val n = when (k) {
                 4, 6 -> rainN()
                 5 -> when (code) { 71, 85 -> 70; 73 -> 130; 75, 86 -> 260; else -> 90 }
                 else -> 0
             }
             parts = ArrayList()
-            repeat(n) {
+            repeat((n * qMul).toInt()) {
                 val d = rnd.nextFloat()
                 parts.add(
                     if (k == 5) P(rnd.nextFloat() * w, rnd.nextFloat() * h, (1.5f + 3.5f * d) * (if (heavy) 1.5f else 1f), d)
@@ -502,7 +512,7 @@ class WeatherWallpaperService : WallpaperService() {
             handler.removeCallbacks(tick)
             handler.removeCallbacks(refresh)
             lastMs = 0L
-            if (v) { handler.post(refresh); handler.post(tick) }
+            if (v) { init(); handler.post(refresh); handler.post(tick) }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -946,7 +956,7 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawRect(-w * 0.3f, h * 0.12f, w * 1.3f, h * 0.30f, paint)
                     useShader(null)
                     c.restore()
-                    for (i in 0 until 140) {
+                        for (i in 0 until (if (showStars) 140 else 0)) {
                         val x = ((i * 7919) % 1000) / 1000f * w
                         val y = ((i * 104729) % 1000) / 1000f * h * 0.62f
                         val big = i % 9 == 0
@@ -1021,7 +1031,7 @@ class WeatherWallpaperService : WallpaperService() {
             paint.alpha = 255
 
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
-            if (showHills) {
+                if (showHillsV) {
                 val hb = hillBitmap(k, bot)
                 val hox = tiltX * w * 0.03f
                 val hoy = tiltY * h * 0.01f
