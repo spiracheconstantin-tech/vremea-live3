@@ -111,7 +111,6 @@ class MainActivity : Activity() {
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            // Setează fundalul barei de sus ca fiind complet transparent
             setBackgroundColor(Color.TRANSPARENT)
             val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
             val sbH = if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * resources.displayMetrics.density).toInt()
@@ -124,13 +123,10 @@ class MainActivity : Activity() {
         }
         
         titleTv = tv("", 22f, true).apply {
-            // Forțează textul să treacă pe rândul următor dacă orașul are numele lung, protejând meniul
             isSingleLine = false
             maxLines = 2
             ellipsize = android.text.TextUtils.TruncateAt.END
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
-        top.addView(titleTv)
         
         val menuBtn = tv("☰", 28f).apply {
             setPadding(
@@ -139,12 +135,17 @@ class MainActivity : Activity() {
                 (16 * resources.displayMetrics.density).toInt(),
                 (4 * resources.displayMetrics.density).toInt()
             )
-            layoutParams = LinearLayout.LayoutParams(-2, -2).apply {
-                gravity = Gravity.CENTER_VERTICAL
-            }
             setOnClickListener { showMenu(it) }
         }
-        top.addView(menuBtn)
+
+        // Adăugăm elementele în container. Folosim layoutParams clare la adăugare pentru a garanta poziționarea.
+        // Titlul primește greutate 1f (ocupă tot spațiul din stânga disponibil)
+        top.addView(titleTv, LinearLayout.LayoutParams(0, -2, 1f))
+        
+        // Meniul primește dimensiune fixă wrap_content în dreapta și aliniere verticală pe centru
+        top.addView(menuBtn, LinearLayout.LayoutParams(-2, -2).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
         
         body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
