@@ -102,11 +102,13 @@ class MainActivity : Activity() {
         else -> Triple(6, "Furtună", "⛈️")
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+   override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ro.vremea.wallpaper.TransparentBars.apply(this)
+
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-       val top = LinearLayout(this).apply {
+        
+        val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
             val sbH = if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * resources.displayMetrics.density).toInt()
@@ -117,17 +119,13 @@ class MainActivity : Activity() {
                 (8 * resources.displayMetrics.density).toInt()
             )
         }
+        
         titleTv = tv("", 22f, true).apply {
-            textSize = 22f
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
         top.addView(titleTv)
-        1. val menuBtn = tv("☰", 28f).apply {
-            text = "☰"
-            textSize = 28f
-            setTextColor(Color.WHITE)
+        
+        val menuBtn = tv("☰", 28f).apply {
             setPadding(
                 (16 * resources.displayMetrics.density).toInt(),
                 (4 * resources.displayMetrics.density).toInt(),
@@ -138,6 +136,12 @@ class MainActivity : Activity() {
             setOnClickListener { showMenu(it) }
         }
         top.addView(menuBtn)
+        
+        body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), dp(32))
+        }
+        
         val scroll = ScrollView(this)
         var pullStartY = 0f
         scroll.setOnTouchListener { view, event ->
@@ -151,14 +155,14 @@ class MainActivity : Activity() {
             false
         }
         scroll.addView(body)
-                attachPull(this, scroll) { load() }
+        attachPull(this, scroll) { load() }
+        
         root.addView(top)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
         setContentView(root)
         setBg(0, true)
         if (!prefs.contains("lat")) myLocation()
     }
-
     override fun onResume() {
         super.onResume()
         handler.removeCallbacks(ticker)
