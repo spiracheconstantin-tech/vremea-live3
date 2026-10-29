@@ -117,14 +117,14 @@ class MainActivity : Activity() {
                 (8 * resources.displayMetrics.density).toInt()
             )
         }
-        titleTv = TextView(this).apply {
+        titleTv = tv("", 22f, true).apply {
             textSize = 22f
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
         top.addView(titleTv)
-        val menuBtn = TextView(this).apply {
+        1. val menuBtn = tv("☰", 28f).apply {
             text = "☰"
             textSize = 28f
             setTextColor(Color.WHITE)
