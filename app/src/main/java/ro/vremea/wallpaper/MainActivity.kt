@@ -437,7 +437,7 @@ class MainActivity : Activity() {
                     "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day" +
                     "&hourly=temperature_2m,weather_code,precipitation_probability" +
                     "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max" +
-                    "&timezone=auto&forecast_days=7" + (if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else "")
+                    &minutely_15=precipitation&forecast_minutely_15=8&timezone=auto&forecast_days=7
                 val j = JSONObject(URL(url).readText())
                 var label = "Open-Meteo"
                 if (src != "om") {
@@ -473,7 +473,24 @@ class MainActivity : Activity() {
             }
         }.start()
     }
-
+        private fun rainSoon(j: JSONObject): String? {
+        val m = j.optJSONObject("minutely_15") ?: return null
+        val pr = m.optJSONArray("precipitation") ?: return null
+        val tm = m.optJSONArray("time") ?: return null
+        val curT = j.getJSONObject("current").getString("time")
+        var s = 0
+        while (s < tm.length() && tm.getString(s) < curT) s++
+        if (s >= tm.length()) return null
+        val rainingNow = pr.optDouble(s, 0.0) >= 0.1
+        for (i in s until tm.length()) {
+            val r = pr.optDouble(i, 0.0) >= 0.1
+            if (r != rainingNow) {
+                val mins = (i - s) * 15
+                return if (rainingNow) "☔ Plouă acum, se oprește în ~$mins min" else "☔ Începe să plouă în ~$mins min"
+            }
+        }
+        return if (rainingNow) "☔ Plouă în următoarele 2 ore" else null
+    }
     private fun cell(t: String, w: Float, end: Boolean = false) = tv(t, 15f).apply {
         if (end) gravity = Gravity.END
         layoutParams = LinearLayout.LayoutParams(0, -2, w)
@@ -504,7 +521,7 @@ class MainActivity : Activity() {
         val mx = d.getJSONArray("temperature_2m_max").getDouble(0).roundToInt()
         val mn = d.getJSONArray("temperature_2m_min").getDouble(0).roundToInt()
         add(tv("Max $mx°  ·  Min $mn°", 16f, alpha = .9f).apply { gravity = Gravity.CENTER }, 4)
-
+        rainSoon(j)?.let { add(tv(it, 15f, alpha = .95f).apply { gravity = Gravity.CENTER }, 6) }
         // comparatie intre surse
         val cmpArr = j.optJSONArray("cmp")
         if (cmpArr != null && cmpArr.length() > 1) {
