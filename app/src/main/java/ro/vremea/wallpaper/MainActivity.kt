@@ -106,20 +106,38 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         ro.vremea.wallpaper.TransparentBars.apply(this)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val top = LinearLayout(this).apply {
+       val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(36), dp(8), dp(8))
+            val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            val sbH = if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * resources.displayMetrics.density).toInt()
+            setPadding(
+                (20 * resources.displayMetrics.density).toInt(),
+                sbH + (12 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt()
+            )
         }
-        titleTv = tv("", 22f, true)
-        top.addView(titleTv, LinearLayout.LayoutParams(0, -2, 1f))
-        val menuBtn = tv("☰", 28f)
-        menuBtn.setPadding(dp(16), dp(4), dp(16), dp(4))
-        menuBtn.setOnClickListener { showMenu(it) }
+        titleTv = TextView(this).apply {
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        top.addView(titleTv)
+        val menuBtn = TextView(this).apply {
+            text = "☰"
+            textSize = 28f
+            setTextColor(Color.WHITE)
+            setPadding(
+                (16 * resources.displayMetrics.density).toInt(),
+                (4 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (4 * resources.displayMetrics.density).toInt()
+            )
+            layoutParams = LinearLayout.LayoutParams(-2, -2)
+            setOnClickListener { showMenu(it) }
+        }
         top.addView(menuBtn)
-        body = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), 0, dp(16), dp(32))
-        }
         val scroll = ScrollView(this)
         var pullStartY = 0f
         scroll.setOnTouchListener { view, event ->
