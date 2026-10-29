@@ -18,7 +18,7 @@ xml
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
-            android:name=".MainActivity"
+            android:name="ro.vremea.wallpaper.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -27,7 +27,7 @@ xml
         </activity>
 
         <service
-            android:name=".WeatherWallpaperService"
+            android:name="ro.vremea.wallpaper.WeatherWallpaperService"
             android:permission="android.permission.BIND_WALLPAPER"
             android:exported="true">
             <intent-filter>
@@ -39,7 +39,7 @@ xml
         </service>
 
         <receiver
-            android:name=".WeatherWidget"
+            android:name="ro.vremea.wallpaper.WeatherWidget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
