@@ -6,13 +6,20 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.*
+import android.os.Bundle
 import android.widget.RemoteViews
 import org.json.JSONObject
 import java.net.URL
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+private class WD(
+    val name: String, val t: Double, val feels: Double, val code: Int,
+    val day: Boolean, val mx: Double, val mn: Double, val f: Boolean
+)
 
 class WeatherWidget : AppWidgetProvider() {
 
@@ -21,6 +28,10 @@ class WeatherWidget : AppWidgetProvider() {
         Thread {
             try { updateAll(context) } catch (e: Exception) { } finally { pr.finish() }
         }.start()
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle) {
+        refreshAll(context)
     }
 
     companion object {
@@ -42,12 +53,30 @@ class WeatherWidget : AppWidgetProvider() {
             val mgr = AppWidgetManager.getInstance(ctx)
             val ids = mgr.getAppWidgetIds(ComponentName(ctx, WeatherWidget::class.java))
             if (ids.isEmpty()) return
-            val bmp = build(ctx) ?: return
+            val data = fetch(ctx) ?: return
+            val dens = ctx.resources.displayMetrics.density
+            val land = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             val pi = PendingIntent.getActivity(
                 ctx, 0, Intent(ctx, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             for (id in ids) {
+                val o = mgr.getAppWidgetOptions(id)
+                val wdp0 = if (land) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 250) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
+                val hdp0 = if (land) o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110) else o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110)
+                val wdp = if (wdp0 > 0) wdp0 else 250
+                val hdp = if (hdp0 > 0) hdp0 else 110
+                var wp = (wdp * dens).toInt()
+                var hp = (hdp * dens).toInt()
+                val big = max(wp, hp)
+                if (big > 900) {
+                    val s = 900f / big
+                    wp = (wp * s).toInt()
+                    hp = (hp * s).toInt()
+                }
+                wp = max(wp, 100)
+                hp = max(hp, 60)
+                val bmp = draw(data, wp, hp)
                 val rv = RemoteViews(ctx.packageName, R.layout.widget)
                 rv.setImageViewBitmap(R.id.img, bmp)
                 rv.setOnClickPendingIntent(R.id.img, pi)
@@ -55,7 +84,7 @@ class WeatherWidget : AppWidgetProvider() {
             }
         }
 
-        private fun build(ctx: Context): Bitmap? {
+        private fun fetch(ctx: Context): WD? {
             try {
                 val ap = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
                 val f = ap.getString("units", "c") == "f"
@@ -72,7 +101,7 @@ class WeatherWidget : AppWidgetProvider() {
                 val j = JSONObject(conn.getInputStream().bufferedReader().readText())
                 val cur = j.getJSONObject("current")
                 val d = j.getJSONObject("daily")
-                return draw(
+                return WD(
                     name,
                     cur.getDouble("temperature_2m"),
                     cur.getDouble("apparent_temperature"),
@@ -110,49 +139,93 @@ class WeatherWidget : AppWidgetProvider() {
             else -> "Furtună"
         }
 
-        private fun draw(name: String, t: Double, feels: Double, code: Int, day: Boolean, mx: Double, mn: Double, f: Boolean): Bitmap {
-            val W = 720
-            val H = 300
+        // scrie textul si il micsoreaza daca nu incape in latimea disponibila
+        private fun put(c: Canvas, p: Paint, s: String, x: Float, y: Float, size: Float, maxW: Float, alpha: Int = 255) {
+            p.color = Color.argb(alpha, 255, 255, 255)
+            p.textSize = size
+            val w = p.measureText(s)
+            if (w > maxW && w > 0f && maxW > 0f) p.textSize = size * maxW / w
+            c.drawText(s, x, y, p)
+        }
+
+        private fun draw(d: WD, W: Int, H: Int): Bitmap {
             val wf = W.toFloat()
             val hf = H.toFloat()
             val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
             val c = Canvas(bmp)
             val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            val rad = min(wf, hf) * 0.17f
             val clip = Path()
-            clip.addRoundRect(RectF(0f, 0f, wf, hf), 52f, 52f, Path.Direction.CW)
+            clip.addRoundRect(RectF(0f, 0f, wf, hf), rad, rad, Path.Direction.CW)
             c.clipPath(clip)
 
-            val k = cat(code)
-            val pal = if (day) DP else NP
+            val k = cat(d.code)
+            val pal = if (d.day) DP else NP
             p.shader = LinearGradient(0f, 0f, 0f, hf, pal[k * 2], pal[k * 2 + 1], Shader.TileMode.CLAMP)
             c.drawPaint(p)
             p.shader = null
 
-            val tc = (if (f) (t - 32.0) * 5.0 / 9.0 else t).toFloat()
+            val tc = (if (d.f) (d.t - 32.0) * 5.0 / 9.0 else d.t).toFloat()
             if (tc < 15f) {
                 c.drawColor(Color.argb(((15f - max(tc, -10f)) / 25f * 80).toInt(), 120, 170, 255))
             } else {
                 c.drawColor(Color.argb(((min(tc, 38f) - 15f) / 23f * 90).toInt(), 255, 130, 50))
             }
 
-            val ic = weatherBitmap(code, day)
-            c.drawBitmap(ic, null, RectF(440f, 20f, 700f, 280f), p)
+            val ic = weatherBitmap(d.code, d.day)
+            val nm = if (d.name.length > 20) d.name.take(19) + "…" else d.name
+            val temp = "${d.t.roundToInt()}°"
+            val lab = label(d.code)
+            val full = "Max ${d.mx.roundToInt()}° · Min ${d.mn.roundToInt()}° · Simte ${d.feels.roundToInt()}°"
+            val short = "Max ${d.mx.roundToInt()}° · Min ${d.mn.roundToInt()}°"
+            val aspect = wf / hf
+            val shadowR = max(2f, min(wf, hf) * 0.02f)
 
-            val nm = if (name.length > 18) name.take(17) + "…" else name
-            p.color = Color.WHITE
-            p.setShadowLayer(6f, 0f, 2f, 0x66000000)
-            p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            p.textSize = 34f
-            c.drawText(nm, 40f, 64f, p)
-            p.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            p.textSize = 130f
-            c.drawText("${t.roundToInt()}°", 36f, 186f, p)
-            p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            p.textSize = 30f
-            c.drawText(label(code), 40f, 232f, p)
-            p.textSize = 24f
-            p.alpha = 220
-            c.drawText("Max ${mx.roundToInt()}° · Min ${mn.roundToInt()}° · Simte ${feels.roundToInt()}°", 40f, 274f, p)
+            if (aspect > 3.2f) {
+                // chenar lat si jos: o singura linie
+                val m = hf * 0.08f
+                val isz = hf * 0.86f
+                c.drawBitmap(ic, null, RectF(m, (hf - isz) / 2f, m + isz, (hf + isz) / 2f), p)
+                p.setShadowLayer(shadowR, 0f, shadowR / 3f, 0x66000000)
+                p.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+                val x = m + isz + m
+                put(c, p, temp, x, hf * 0.74f, hf * 0.62f, wf * 0.22f)
+                val x2 = x + p.measureText(temp) + m * 1.5f
+                val mw = wf - x2 - m
+                p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                put(c, p, nm, x2, hf * 0.44f, hf * 0.28f, mw)
+                p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                put(c, p, lab, x2, hf * 0.80f, hf * 0.24f, mw, 230)
+            } else if (aspect >= 1.45f) {
+                // chenar obisnuit (de exemplu 4x2 sau 3x2)
+                val m = hf * 0.10f
+                val isz = min(hf * 0.80f, wf * 0.38f)
+                val ir = RectF(wf - m - isz, (hf - isz) / 2f, wf - m, (hf + isz) / 2f)
+                c.drawBitmap(ic, null, ir, p)
+                p.setShadowLayer(shadowR, 0f, shadowR / 3f, 0x66000000)
+                val maxW = ir.left - m * 1.5f
+                p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                put(c, p, nm, m, hf * 0.20f, hf * 0.115f, maxW)
+                p.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+                put(c, p, temp, m - hf * 0.01f, hf * 0.60f, hf * 0.40f, maxW)
+                p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                put(c, p, lab, m, hf * 0.76f, hf * 0.10f, maxW)
+                put(c, p, if (maxW > hf * 1.2f) full else short, m, hf * 0.91f, hf * 0.082f, maxW, 220)
+            } else {
+                // chenar aproape patrat (de exemplu 2x2)
+                val m = wf * 0.07f
+                val base = min(wf, hf)
+                val isz = base * 0.40f
+                c.drawBitmap(ic, null, RectF(wf - m - isz, m, wf - m, m + isz), p)
+                p.setShadowLayer(shadowR, 0f, shadowR / 3f, 0x66000000)
+                p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                put(c, p, nm, m, m + base * 0.09f, base * 0.09f, wf - isz - 3f * m)
+                p.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+                put(c, p, temp, m, hf * 0.70f, base * 0.28f, wf - 2f * m)
+                p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                put(c, p, lab, m, hf * 0.82f, base * 0.085f, wf - 2f * m)
+                put(c, p, short, m, hf * 0.93f, base * 0.07f, wf - 2f * m, 220)
+            }
             return bmp
         }
     }
