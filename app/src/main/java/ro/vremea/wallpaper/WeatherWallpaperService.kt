@@ -216,8 +216,171 @@ class WeatherWallpaperService : WallpaperService() {
         }
 
         private fun hm(s: String): Int = s.substring(11, 13).toInt() * 60 + s.substring(14, 16).toInt()
+                private val wpModels = mapOf(
+            "ecmwf" to "ecmwf_ifs025",
+            "gfs" to "gfs_seamless",
+            "icon" to "icon_seamless",
+            "mf" to "meteofrance_seamless"
+        )
+        private var lastLoadAt = 0L
+        private var lastLoadKey = ""
+
+        private fun httpGet(u: String, ua: String? = null): String {
+            val conn = URL(u).openConnection().apply {
+                connectTimeout = 10000
+                readTimeout = 10000
+                if (ua != null) setRequestProperty("User-Agent", ua)
+            }
+            return conn.getInputStream().bufferedReader().readText()
+        }
+
+        private fun symCode(s: String): Int {
+            val x = s.lowercase()
+            return when {
+                x.contains("thunder") -> 95
+                x.contains("sleet") -> 67
+                x.contains("snow") -> when { x.contains("heavy") -> 75; x.contains("light") -> 71; else -> 73 }
+                x.contains("rain") -> when { x.contains("heavy") -> 65; x.contains("light") -> 61; else -> 63 }
+                x.contains("fog") -> 45
+                x.startsWith("clearsky") -> 0
+                x.startsWith("fair") -> 1
+                x.startsWith("partlycloudy") -> 2
+                x.startsWith("cloudy") -> 3
+                else -> -1
+            }
+        }
 
         private fun load(lat: Double, lon: Double) {
+            val ap0 = getSharedPreferences("app", MODE_PRIVATE)
+            val key0 = "$lat|$lon|" + ap0.getString("src", "om") + "|" + ap0.getString("units", "c")
+            val nowT = SystemClock.uptimeMillis()
+            if (key0 == lastLoadKey && nowT - lastLoadAt < 5 * 60_000L) return
+            lastLoadKey = key0
+            lastLoadAt = nowT
+            Thread {
+                try {
+                    val ap = getSharedPreferences("app", MODE_PRIVATE)
+                    val f = ap.getString("units", "c") == "f"
+                    val src = ap.getString("src", "om") ?: "om"
+                    val unit = if (f) "&temperature_unit=fahrenheit&wind_speed_unit=mph" else ""
+                    val cols = "temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover,precipitation"
+
+                    val j = JSONObject(
+                        httpGet(
+                            "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                                "&current=$cols,is_day&daily=sunrise,sunset&forecast_days=1&timezone=auto$unit"
+                        )
+                    )
+                    val cur = j.getJSONObject("current")
+                    try {
+                        val d = j.getJSONObject("daily")
+                        val sr = d.getJSONArray("sunrise")
+                        val ss = d.getJSONArray("sunset")
+                        sunrise = hm(sr.getString(sr.length() - 1))
+                        sunset = hm(ss.getString(ss.length() - 1))
+                    } catch (e: Exception) { }
+
+                    class Smp(val t: Double, val ws: Double, val wd: Double, val cl: Double, val pr: Double, val code: Int)
+
+                    val base = Smp(
+                        cur.getDouble("temperature_2m"),
+                        cur.getDouble("wind_speed_10m"),
+                        cur.optDouble("wind_direction_10m", 270.0),
+                        cur.optDouble("cloud_cover", 0.0),
+                        cur.optDouble("precipitation", 0.0),
+                        cur.getInt("weather_code")
+                    )
+                    val extra = ArrayList<Smp>()
+
+                    if (src == "met" || src == "avg") {
+                        try {
+                            val txt = httpGet(
+                                "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=" +
+                                    String.format(java.util.Locale.US, "%.4f", lat) + "&lon=" +
+                                    String.format(java.util.Locale.US, "%.4f", lon),
+                                "VremeaLive/1.0 github.com/spiracheconstantin-tech/vremea-live3"
+                            )
+                            val data = JSONObject(txt).getJSONObject("properties")
+                                .getJSONArray("timeseries").getJSONObject(0).getJSONObject("data")
+                            val dd = data.getJSONObject("instant").getJSONObject("details")
+                            val tc = dd.optDouble("air_temperature", Double.NaN)
+                            if (!tc.isNaN()) {
+                                val ws = dd.optDouble("wind_speed", Double.NaN)
+                                val n1 = data.optJSONObject("next_1_hours")
+                                val sym = n1?.optJSONObject("summary")?.optString("symbol_code", "") ?: ""
+                                val pa = n1?.optJSONObject("details")?.optDouble("precipitation_amount", Double.NaN) ?: Double.NaN
+                                extra.add(
+                                    Smp(
+                                        if (f) tc * 9.0 / 5.0 + 32.0 else tc,
+                                        ws * (if (f) 2.23694 else 3.6),
+                                        dd.optDouble("wind_from_direction", Double.NaN),
+                                        dd.optDouble("cloud_area_fraction", Double.NaN),
+                                        pa,
+                                        symCode(sym)
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) { }
+                    }
+
+                    val keys: List<String> = when {
+                        src == "avg" -> listOf("ecmwf", "icon", "gfs")
+                        wpModels.containsKey(src) -> listOf(src)
+                        else -> emptyList()
+                    }
+                    for (key in keys) {
+                        try {
+                            val mc = JSONObject(
+                                httpGet(
+                                    "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                                        "&models=" + wpModels[key] + "&current=$cols&timezone=auto$unit"
+                                )
+                            ).getJSONObject("current")
+                            val tt = mc.optDouble("temperature_2m", Double.NaN)
+                            if (!tt.isNaN()) {
+                                extra.add(
+                                    Smp(
+                                        tt,
+                                        mc.optDouble("wind_speed_10m", Double.NaN),
+                                        mc.optDouble("wind_direction_10m", Double.NaN),
+                                        mc.optDouble("cloud_cover", Double.NaN),
+                                        mc.optDouble("precipitation", Double.NaN),
+                                        mc.optInt("weather_code", -1)
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) { }
+                    }
+
+                    val use: List<Smp> = when {
+                        src == "avg" -> listOf(base) + extra
+                        extra.isNotEmpty() -> extra
+                        else -> listOf(base)
+                    }
+                    fun mean(g: (Smp) -> Double, def: Double): Double {
+                        val v = use.map(g).filter { !it.isNaN() }
+                        return if (v.isEmpty()) def else v.average()
+                    }
+
+                    val newCode = if (src != "avg" && extra.isNotEmpty() && extra[0].code >= 0) extra[0].code else base.code
+                    val newDir = if (src != "avg" && extra.isNotEmpty() && !extra[0].wd.isNaN()) extra[0].wd else base.wd
+
+                    utcOff = j.optInt("utc_offset_seconds", 0)
+                    fahr = f
+                    day = cur.getInt("is_day") == 1
+                    temp = mean({ it.t }, base.t)
+                    wind = mean({ it.ws }, base.ws)
+                    windDir = newDir
+                    cloud = mean({ it.cl }, base.cl).roundToInt()
+                    precip = mean({ it.pr }, base.pr)
+                    code = newCode
+                    handler.post { init() }
+                } catch (e: Exception) {
+                    lastLoadAt = 0L
+                }
+            }.start()
+        }
+        private fun loadOm(lat: Double, lon: Double) {
             Thread {
                 try {
                     val f = getSharedPreferences("app", MODE_PRIVATE).getString("units", "c") == "f"
