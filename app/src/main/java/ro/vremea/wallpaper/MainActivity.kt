@@ -104,6 +104,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ro.vremea.wallpaper.TransparentBars.apply(this)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
