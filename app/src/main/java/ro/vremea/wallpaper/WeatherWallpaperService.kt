@@ -11,6 +11,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import org.json.JSONObject
@@ -115,6 +119,18 @@ class WeatherWallpaperService : WallpaperService() {
         private var rayKey = -1L
         private var lastMs = 0L
         private var dtf = 1f
+        private var tiltX = 0f
+        private var tiltY = 0f
+        private var tgX = 0f
+        private var tgY = 0f
+        private val sm by lazy { getSystemService(SENSOR_SERVICE) as SensorManager }
+        private val tiltL = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                tgX = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
+                tgY = (e.values[2] / 9.81f - 0.4f).coerceIn(-1f, 1f)
+            }
+            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+        }
 
         private val tick = object : Runnable {
             override fun run() {
@@ -478,6 +494,11 @@ class WeatherWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(v: Boolean) {
             visible = v
+                        if (v) {
+                sm.registerListener(tiltL, sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME)
+            } else {
+                sm.unregisterListener(tiltL)
+            }
             handler.removeCallbacks(tick)
             handler.removeCallbacks(refresh)
             lastMs = 0L
@@ -785,6 +806,9 @@ class WeatherWallpaperService : WallpaperService() {
             val hx0 = -sin(wr)
             val hx = if (abs(hx0) < 0.2f) (if (hx0 < 0f) -0.2f else 0.2f) else hx0
             val wspd = min(windKmh, 40f) / 40f
+                        val kf = min(1f, 0.1f * dtf)
+            tiltX += (tgX - tiltX) * kf
+            tiltY += (tgY - tiltY) * kf
 
             // cer cu degrade fin (creat o singura data)
             val top = pal[k * 2]
@@ -819,6 +843,8 @@ class WeatherWallpaperService : WallpaperService() {
                 sx = w * (0.12f + 0.76f * frac)
                 sy = h * (0.34f - 0.22f * sin((PI * frac).toFloat()))
             }
+                        sx += tiltX * w * 0.012f
+            sy += tiltY * h * 0.008f
             val dist = min(abs(now - sunrise), abs(now - sunset))
             if (k <= 2 && dist < 50) {
                 val a = 1f - dist / 50f
@@ -986,7 +1012,9 @@ class WeatherWallpaperService : WallpaperService() {
                 if (cl.x > w) cl.x = -bw
                 if (cl.x < -bw) cl.x = w
                 paint.alpha = (Color.alpha(cloudCol) * (0.40f + 0.60f * tt)).toInt().coerceIn(0, 255)
-                rect.set(cl.x, cl.y, cl.x + bw, cl.y + bh)
+                val ox = tiltX * w * (0.01f + 0.035f * tt)
+                val oy = tiltY * h * (0.004f + 0.012f * tt)
+                rect.set(cl.x + ox, cl.y + oy, cl.x + bw + ox, cl.y + bh + oy)
                 c.drawBitmap(cbmp, null, rect, paint)
             }
             paint.colorFilter = null
@@ -995,7 +1023,10 @@ class WeatherWallpaperService : WallpaperService() {
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
             if (showHills) {
                 val hb = hillBitmap(k, bot)
-                c.drawBitmap(hb, 0f, h - hb.height, paint)
+                val hox = tiltX * w * 0.03f
+                val hoy = tiltY * h * 0.01f
+                rect.set(-w * 0.04f + hox, h - hb.height - h * 0.012f + hoy, w * 1.04f + hox, h + h * 0.012f + hoy)
+                c.drawBitmap(hb, null, rect, paint)
             }
 
             // ceata: val usor si fasii subtiri, scurte
