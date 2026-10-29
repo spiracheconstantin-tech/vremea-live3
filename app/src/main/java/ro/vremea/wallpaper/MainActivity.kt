@@ -437,7 +437,7 @@ class MainActivity : Activity() {
                     "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day" +
                     "&hourly=temperature_2m,weather_code,precipitation_probability" +
                     "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max" +
-                    &minutely_15=precipitation&forecast_minutely_15=8&timezone=auto&forecast_days=7
+                    "&minutely_15=precipitation&forecast_minutely_15=8&timezone=auto&forecast_days=7"
                 val j = JSONObject(URL(url).readText())
                 var label = "Open-Meteo"
                 if (src != "om") {
@@ -473,7 +473,7 @@ class MainActivity : Activity() {
             }
         }.start()
     }
-        private fun rainSoon(j: JSONObject): String? {
+    private fun rainSoon(j: JSONObject): String? {
         val m = j.optJSONObject("minutely_15") ?: return null
         val pr = m.optJSONArray("precipitation") ?: return null
         val tm = m.optJSONArray("time") ?: return null
