@@ -1,4 +1,48 @@
 plugins {
-    id("com.android.application") version "8.5.2" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "ro.vremea.wallpaper"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "ro.vremea.wallpaper"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    // Îi dictăm lui Gradle să caute fișierele direct unde s-au salvat ele pe GitHub
+    sourceSets {
+        getByName("main") {
+            manifest.srcFile("main/AndroidManifest.xml")
+            java.srcDirs("main/java")
+        }
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
 }
