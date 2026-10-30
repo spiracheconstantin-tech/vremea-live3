@@ -553,6 +553,12 @@ class WeatherWallpaperService : WallpaperService() {
 
         // Nor cu volum: luminos sus, umbrit jos
         private fun cloudBitmap(col: Int): Bitmap {
+                        val cachedC = cloudBmp
+            if (cachedC != null && cloudKey == (col and 0x00FFFFFF)) return cachedC
+            val madeC = makeCloudBitmap(col)
+            cloudBmp = madeC
+            cloudKey = col and 0x00FFFFFF
+            if (madeC.width > 0) return madeC
             val key = col and 0x00FFFFFF
             val old = cloudBmp
             if (old != null && cloudKey == key) return old
