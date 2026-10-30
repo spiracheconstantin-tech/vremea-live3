@@ -44,7 +44,9 @@ private fun card(a: Activity): LinearLayout {
     val l = LinearLayout(a)
     l.orientation = LinearLayout.VERTICAL
     val bg = GradientDrawable()
-    bg.setColor(0x33FFFFFF)
+        bg.orientation = GradientDrawable.Orientation.TL_BR
+    bg.setColors(intArrayOf(0x55FFFFFF, 0x14FFFFFF))
+    bg.setStroke(max(1, (1 * d).toInt()), 0x44FFFFFF)
     bg.cornerRadius = 18f * d
     l.background = bg
     l.setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
