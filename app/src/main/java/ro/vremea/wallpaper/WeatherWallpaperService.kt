@@ -119,6 +119,7 @@ class WeatherWallpaperService : WallpaperService() {
         private var rayKey = -1L
         private var lastMs = 0L
         private var dtf = 1f
+        private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
         private var showStars = true
@@ -1031,7 +1032,8 @@ class WeatherWallpaperService : WallpaperService() {
             paint.alpha = 255
 
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
-                if (showHillsV) {
+            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY)
+            if (false) {
                 val hb = hillBitmap(k, bot)
                 val hox = tiltX * w * 0.03f
                 val hoy = tiltY * h * 0.01f
