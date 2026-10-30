@@ -81,12 +81,15 @@ class MainActivity : Activity() {
         body.addView(v, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) })
     }
 
-    private fun setBg(k: Int, day: Boolean) {
+        private fun setBg(k: Int, day: Boolean) {
         val p = if (day) dayP else nightP
-        root.background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.parseColor(p[k * 2]), Color.parseColor(p[k * 2 + 1]))
-        )
+        val c1 = Color.parseColor(p[k * 2])
+        val c2 = Color.parseColor(p[k * 2 + 1])
+        root.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c1, c2))
+        window.statusBarColor = c1
+        window.navigationBarColor = c2
+        window.decorView.systemUiVisibility = window.decorView.systemUiVisibility and
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv() and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
     }
 
     private fun info(c: Int, day: Boolean): Triple<Int, String, String> = when {
@@ -104,10 +107,11 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+                actionBar?.hide()
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(36), dp(8), dp(8))
+            setPadding(dp(20), dp(12), dp(8), dp(8))
         }
         titleTv = tv("", 22f, true)
         top.addView(titleTv, LinearLayout.LayoutParams(0, -2, 1f))
