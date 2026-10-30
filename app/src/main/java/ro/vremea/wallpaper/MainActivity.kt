@@ -107,7 +107,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-                actionBar?.hide()
+        actionBar?.hide()
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
