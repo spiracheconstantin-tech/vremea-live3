@@ -66,9 +66,9 @@ class MainActivity : Activity() {
         if (bold) setTypeface(typeface, Typeface.BOLD)
     }
 
-    private fun glass() = GradientDrawable().apply {
-        setColor(0x33FFFFFF)
+        private fun glass() = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0x55FFFFFF, 0x14FFFFFF)).apply {
         cornerRadius = dp(18).toFloat()
+        setStroke(dp(1), 0x44FFFFFF)
     }
 
     private fun panel() = LinearLayout(this).apply {
