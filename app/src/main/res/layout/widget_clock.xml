@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
+    <TextClock
+        android:id="@+id/clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="4dp"
+        android:format12Hour="hh:mm"
+        android:format24Hour="HH:mm"
+        android:fontFamily="sans-serif-thin"
+        android:shadowColor="#66000000"
+        android:shadowDy="2"
+        android:shadowRadius="4"
+        android:textColor="#FFFFFF"
+        android:textSize="52sp" />
+    <TextClock
+        android:id="@+id/date"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="72dp"
+        android:format12Hour="EEEE, d MMMM"
+        android:format24Hour="EEEE, d MMMM"
+        android:shadowColor="#66000000"
+        android:shadowDy="2"
+        android:shadowRadius="3"
+        android:textColor="#E6FFFFFF"
+        android:textSize="15sp" />
+</FrameLayout>
