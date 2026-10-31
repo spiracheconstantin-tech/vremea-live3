@@ -174,7 +174,7 @@ class LifeFx {
         // frunze toamna, petale primavara
         val autumn = mo in 8..10
         val spring = mo in 2..4
-        if (calm && (autumn || spring)) {
+                if (calm && spring) {
             for (i in 0 until np) {
                 py[i] += pvy[i] * us * dtf * 1.5f
                 px[i] += (hx * (0.8f + wspd * 4f) + sin(t * 1.3f + i) * 0.9f) * us * dtf * 1.5f
