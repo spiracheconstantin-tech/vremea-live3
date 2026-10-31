@@ -122,6 +122,9 @@ class WeatherWallpaperService : WallpaperService() {
         private val fx = LifeFx()
         private val skyFade = SkyFade()
         private val meteors = MeteorFx()
+                private val flat = FlatSky()
+        private val ground = GroundFx(this@WeatherWallpaperService)
+        private var flatStyle = false
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -205,6 +208,7 @@ class WeatherWallpaperService : WallpaperService() {
             if (pmgr.isPowerSaveMode || lvl < 20) frameMs = 33L
             showStars = ap0.getBoolean("wp_stars", true)
             showHillsV = ap0.getBoolean("wp_hills", true)
+                        flatStyle = ap0.getBoolean("wp_flat", false)
             val n = when (k) {
                 4, 6 -> rainN()
                 5 -> when (code) { 71, 85 -> 70; 73 -> 130; 75, 86 -> 260; else -> 90 }
@@ -906,7 +910,8 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // soare / luna + stele
-            if (k <= 1) {
+                        if (k <= 1 && flatStyle) flat.draw(c, day, sx, sy, w, h, t)
+            if (k <= 1 && !flatStyle) {
                 if (day) {
                     val warm = (1f - dist / 90f).coerceIn(0f, 1f)
                     val r = w * 0.085f * (1f + 0.4f * warm)
@@ -1255,6 +1260,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // vigneta fina (creata o singura data)
+                        ground.draw(c, w, h, t, dtf, code, tC)
             meteors.draw(c, w, h, t, dtf, !day, k <= 1)
             fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
             val vk = w.toLong() * 10000L + h.toLong()
