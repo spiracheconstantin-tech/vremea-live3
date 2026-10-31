@@ -27,7 +27,7 @@ class LifeFx {
     private var gh = 0f
 
     // frunze (toamna) si petale (primavara)
-    private val np = 18
+        private val np = 6
     private val px = FloatArray(np)
     private val py = FloatArray(np)
     private val pvy = FloatArray(np)
@@ -186,7 +186,9 @@ class LifeFx {
                 c.rotate(prot[i])
                 c.scale(1f, 0.35f + 0.65f * abs(cos(t * 1.8f + pfl[i])))
                 p.color = pcol[i]
-                if (autumn) {
+                                if (autumn) {
+                    LeafArt.draw(c, p, sp, s)
+                } else if (false) {
                     rect.set(-s, -s * 0.55f, s, s * 0.55f)
                     c.drawOval(rect, p)
                     sp.color = Color.argb(120, 90, 50, 20)
