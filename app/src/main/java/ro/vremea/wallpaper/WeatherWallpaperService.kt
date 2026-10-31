@@ -196,6 +196,10 @@ class WeatherWallpaperService : WallpaperService() {
             val ql = ap0.getString("wp_quality", "normal")
             qMul = if (ql == "eco") 0.5f else if (ql == "max") 1.3f else 1f
             frameMs = if (ql == "eco") 33L else 16L
+            val pmgr = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            val bi = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val lvl = if (bi != null) bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) * 100 / max(1, bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)) else 100
+            if (pmgr.isPowerSaveMode || lvl < 20) frameMs = 33L
             showStars = ap0.getBoolean("wp_stars", true)
             showHillsV = ap0.getBoolean("wp_hills", true)
             val n = when (k) {
