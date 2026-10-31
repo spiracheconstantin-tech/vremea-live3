@@ -9,8 +9,9 @@ android {
         applicationId = "ro.vremea.wallpaper"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        val vc = (project.findProperty("vCode") as String?)?.toIntOrNull() ?: 1
+        versionCode = vc
+        versionName = "build $vc"
     }
     signingConfigs {
         getByName("debug") {
