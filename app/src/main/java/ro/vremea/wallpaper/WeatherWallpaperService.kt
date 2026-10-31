@@ -120,6 +120,8 @@ class WeatherWallpaperService : WallpaperService() {
         private var lastMs = 0L
         private var dtf = 1f
         private val fx = LifeFx()
+        private val skyFade = SkyFade()
+        private val meteors = MeteorFx()
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -283,6 +285,22 @@ class WeatherWallpaperService : WallpaperService() {
         }
 
         private fun load(lat: Double, lon: Double) {
+        val tm = TestMode.read(this@WeatherWallpaperService)
+            if (tm != null) {
+                code = tm.code
+                temp = tm.temp
+                wind = tm.wind
+                windDir = tm.dir
+                cloud = tm.cloud
+                precip = tm.precip
+                sunrise = 7 * 60
+                sunset = 19 * 60
+                day = tm.minute >= sunrise && tm.minute <= sunset
+                fahr = false
+                utcOff = tm.minute * 60 - ((System.currentTimeMillis() / 1000) % 86400L).toInt()
+                handler.post { init() }
+                return
+            }
             val ap0 = getSharedPreferences("app", MODE_PRIVATE)
             val key0 = "$lat|$lon|" + ap0.getString("src", "om") + "|" + ap0.getString("units", "c")
             val nowT = SystemClock.uptimeMillis()
@@ -839,10 +857,11 @@ class WeatherWallpaperService : WallpaperService() {
             tiltY += (tgY - tiltY) * kf
 
             // cer cu degrade fin (creat o singura data)
-            val top = pal[k * 2]
-            val bot = pal[k * 2 + 1]
+            val sf = skyFade.colors(pal[k * 2], pal[k * 2 + 1], dtf)
+            val top = sf[0]
+            val bot = sf[1]
             val skK = (k * 2 + (if (day) 1 else 0)).toLong() * 100000000L + w.toLong() * 10000L + h.toLong()
-            if (skyShader == null || skyKey != skK) {
+            if (skyShader == null || skyKey != skK || skyFade.changing) {
                 skyShader = LinearGradient(
                     0f, 0f, 0f, h,
                     intArrayOf(top, blend(top, bot, 0.35f), blend(top, bot, 0.8f), mixWhite(bot, 0.12f)),
@@ -1236,6 +1255,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // vigneta fina (creata o singura data)
+            meteors.draw(c, w, h, t, dtf, !day, k <= 1)
             fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
             val vk = w.toLong() * 10000L + h.toLong()
             if (vigShader == null || vigKey != vk) {
