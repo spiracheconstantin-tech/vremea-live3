@@ -487,9 +487,24 @@ class MainActivity : Activity() {
                     }
                 }
                 j.put("src", label)
+                getSharedPreferences("cache", MODE_PRIVATE).edit().putString("last", j.toString()).putLong("at", System.currentTimeMillis()).apply()
                 runOnUiThread { render(j, f) }
             } catch (e: Exception) {
-                runOnUiThread { toast("Nu pot încărca datele. Verifică internetul.") }
+                               val cs = getSharedPreferences("cache", MODE_PRIVATE).getString("last", null)
+                if (cs != null) {
+                    val age = (System.currentTimeMillis() - getSharedPreferences("cache", MODE_PRIVATE).getLong("at", 0L)) / 60000L
+                    runOnUiThread {
+                        try {
+                            val cj = JSONObject(cs)
+                            cj.put("src", "Date salvate (acum $age min)")
+                            render(cj, f)
+                        } catch (e2: Exception) {
+                            toast("Nu pot încărca datele. Verifică internetul.")
+                        }
+                    }
+                } else {
+                    runOnUiThread { toast("Nu pot încărca datele. Verifică internetul.") }
+                }
             }
         }.start()
     }
@@ -613,6 +628,7 @@ class MainActivity : Activity() {
         hp.addView(hs)
         add(hp, 12)
         addChart(this, body, j)
+        addSunMoon(this, body, j)
 
         // 7 zile
         val dpn = panel()
