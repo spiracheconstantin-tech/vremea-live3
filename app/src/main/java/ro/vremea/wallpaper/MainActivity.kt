@@ -175,6 +175,10 @@ class MainActivity : Activity() {
         m.menu.add(0, 8, 7, "📡 Sursă date: " + srcName() + " (schimbă)")
                 m.menu.add(0, 9, 8, "⚙️ Setări fundal animat")
         m.menu.add(0, 10, 9, "🔔 Alerte vreme periculoasă: " + (if (prefs.getBoolean("alerts", false)) "pornite" else "oprite"))
+        m.menu.add(0, 11, 10, "🌅 Rezumat de dimineață: " + (if (prefs.getBoolean("morning", false)) "pornit" else "oprit"))
+        m.menu.add(0, 12, 11, "☔ Alertă ploaie în curând: " + (if (prefs.getBoolean("rainsoon", false)) "pornită" else "oprită"))
+        m.menu.add(0, 13, 12, "🧪 Mod test fundal")
+        m.menu.add(0, 14, 13, "⬆️ Caută actualizări")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -187,6 +191,10 @@ class MainActivity : Activity() {
                 8 -> pickSource()
                 9 -> wallpaperSettings(this)
                 10 -> toggleAlerts(this)
+                11 -> toggleSmart(this, "morning", "Rezumat de dimineață")
+                12 -> toggleSmart(this, "rainsoon", "Alertă ploaie")
+                13 -> testMode(this)
+                14 -> checkUpdate(this)
             }
             true
         }
@@ -557,6 +565,7 @@ class MainActivity : Activity() {
         val mn = d.getJSONArray("temperature_2m_min").getDouble(0).roundToInt()
         add(tv("Max $mx°  ·  Min $mn°", 16f, alpha = .9f).apply { gravity = Gravity.CENTER }, 4)
         rainSoon(j)?.let { add(tv(it, 15f, alpha = .95f).apply { gravity = Gravity.CENTER }, 6) }
+        addDaily(this, body, j, f)
         // comparatie intre surse
         val cmpArr = j.optJSONArray("cmp")
         if (cmpArr != null && cmpArr.length() > 1) {
