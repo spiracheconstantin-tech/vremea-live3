@@ -114,7 +114,16 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(12), dp(8), dp(8))
         }
         titleTv = tv("", 22f, true)
+                val prevBtn = tv("‹", 30f)
+        prevBtn.setPadding(dp(4), 0, dp(12), 0)
+        prevBtn.setOnClickListener { cycleCity(this, -1) }
+        val nextBtn = tv("›", 30f)
+        nextBtn.setPadding(dp(12), 0, dp(4), 0)
+        nextBtn.setOnClickListener { cycleCity(this, 1) }
+        top.addView(prevBtn)
         top.addView(titleTv, LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(nextBtn)
+        attachCitySwipe(this, top)
         val menuBtn = tv("☰", 28f)
         menuBtn.setPadding(dp(16), dp(4), dp(16), dp(4))
         menuBtn.setOnClickListener { showMenu(it) }
@@ -179,6 +188,8 @@ class MainActivity : Activity() {
         m.menu.add(0, 12, 11, "☔ Alertă ploaie în curând: " + (if (prefs.getBoolean("rainsoon", false)) "pornită" else "oprită"))
         m.menu.add(0, 13, 12, "🧪 Mod test fundal")
         m.menu.add(0, 14, 13, "⬆️ Caută actualizări")
+                m.menu.add(0, 15, 14, "🌡️ Temperatura în bara de stare: " + (if (prefs.getBoolean("statustemp", false)) "pornită" else "oprită"))
+        m.menu.add(0, 16, 15, "🎨 Stil fundal: " + (if (prefs.getBoolean("wp_flat", false)) "desenat" else "realist"))
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -195,6 +206,8 @@ class MainActivity : Activity() {
                 12 -> toggleSmart(this, "rainsoon", "Alertă ploaie")
                 13 -> testMode(this)
                 14 -> checkUpdate(this)
+                                15 -> toggleTemp(this)
+                16 -> toggleFlat(this)
             }
             true
         }
