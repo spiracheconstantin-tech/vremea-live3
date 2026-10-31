@@ -119,6 +119,7 @@ class WeatherWallpaperService : WallpaperService() {
         private var rayKey = -1L
         private var lastMs = 0L
         private var dtf = 1f
+        private val fx = LifeFx()
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -526,7 +527,13 @@ class WeatherWallpaperService : WallpaperService() {
             handler.removeCallbacks(refresh)
             super.onSurfaceDestroyed(holder)
         }
-
+                override fun onCommand(action: String?, x: Int, y: Int, z: Int, extras: Bundle?, resultRequested: Boolean): Bundle? {
+            if (action == android.app.WallpaperManager.COMMAND_TAP) {
+                fx.tap(x.toFloat(), y.toFloat())
+                if (cat() == 6) nextBolt = 0L
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested)
+        }
         override fun onDestroy() {
             handler.removeCallbacksAndMessages(null)
             super.onDestroy()
@@ -1229,6 +1236,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // vigneta fina (creata o singura data)
+            fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
             val vk = w.toLong() * 10000L + h.toLong()
             if (vigShader == null || vigKey != vk) {
                 vigShader = RadialGradient(
