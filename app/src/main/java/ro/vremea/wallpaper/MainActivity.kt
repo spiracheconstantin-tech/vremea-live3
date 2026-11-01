@@ -150,6 +150,7 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
         setContentView(root)
         setBg(0, true)
+        showCrashIfAny(this)
         if (!prefs.contains("lat")) myLocation()
     }
 
@@ -190,6 +191,7 @@ class MainActivity : Activity() {
         m.menu.add(0, 14, 13, "⬆️ Caută actualizări")
                 m.menu.add(0, 15, 14, "🌡️ Temperatura în bara de stare: " + (if (prefs.getBoolean("statustemp", false)) "pornită" else "oprită"))
         m.menu.add(0, 16, 15, "🎨 Stil fundal: " + (if (prefs.getBoolean("wp_flat", false)) "desenat" else "realist"))
+        m.menu.add(0, 17, 16, "📤 Partajează vremea")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -208,6 +210,7 @@ class MainActivity : Activity() {
                 14 -> checkUpdate(this)
                                 15 -> toggleTemp(this)
                 16 -> toggleFlat(this)
+                17 -> shareWeather(this)
             }
             true
         }
@@ -671,6 +674,7 @@ class MainActivity : Activity() {
         }
         add(dpn, 12)
         addAir(this, body, prefs.getString("lat", "") ?: "", prefs.getString("lon", "") ?: "")
+        addNormal(this, body, j, f)
         add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
