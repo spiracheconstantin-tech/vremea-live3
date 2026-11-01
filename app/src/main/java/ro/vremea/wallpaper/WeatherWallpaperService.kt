@@ -125,6 +125,9 @@ class WeatherWallpaperService : WallpaperService() {
                 private val flat = FlatSky()
         private val ground = GroundFx(this@WeatherWallpaperService)
         private var flatStyle = false
+        private val air = AirFx(this@WeatherWallpaperService)
+        private var locked = false
+        private var lockAt = 0L
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -149,7 +152,12 @@ class WeatherWallpaperService : WallpaperService() {
                 draw()
                 if (visible) {
                     val used = SystemClock.uptimeMillis() - s
-                    handler.postDelayed(this, max(1L, frameMs - used))
+                                       val nowL = SystemClock.uptimeMillis()
+                    if (nowL - lockAt > 2000L) {
+                        lockAt = nowL
+                        locked = (getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager).isKeyguardLocked
+                    }
+                    handler.postDelayed(this, max(1L, (if (locked) 100L else frameMs) - used))
                 }
             }
         }
@@ -1260,6 +1268,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // vigneta fina (creata o singura data)
+                        air.draw(c, w, h)
                         ground.draw(c, w, h, t, dtf, code, tC)
             meteors.draw(c, w, h, t, dtf, !day, k <= 1)
             fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
