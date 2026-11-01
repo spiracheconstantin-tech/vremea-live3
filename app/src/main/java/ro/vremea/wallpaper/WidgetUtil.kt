@@ -36,7 +36,7 @@ internal class CurData(
     val dates: List<String>, val dCode: IntArray, val dMax: DoubleArray, val dMin: DoubleArray
 )
 
-internal fun fetchCur(ctx: Context): CurData? {
+internal fun fetchCurRaw(ctx: Context): CurData? {
     try {
         val ap = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         val f = ap.getString("units", "c") == "f"
