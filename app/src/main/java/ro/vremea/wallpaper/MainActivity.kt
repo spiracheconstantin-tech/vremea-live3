@@ -192,6 +192,10 @@ class MainActivity : Activity() {
                 m.menu.add(0, 15, 14, "🌡️ Temperatura în bara de stare: " + (if (prefs.getBoolean("statustemp", false)) "pornită" else "oprită"))
         m.menu.add(0, 16, 15, "🎨 Stil fundal: " + (if (prefs.getBoolean("wp_flat", false)) "desenat" else "realist"))
         m.menu.add(0, 17, 16, "📤 Partajează vremea")
+        m.menu.add(0, 18, 17, "💾 Salvează setările (copiază)")
+        m.menu.add(0, 19, 18, "📥 Restaurează setările")
+        m.menu.add(0, 20, 19, "📅 Alertă schimbare mare: " + (if (prefs.getBoolean("tomorrow", false)) "pornită" else "oprită"))
+        m.menu.add(0, 21, 20, "📸 Ora de aur: " + (if (prefs.getBoolean("golden", false)) "pornită" else "oprită"))
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -211,6 +215,10 @@ class MainActivity : Activity() {
                                 15 -> toggleTemp(this)
                 16 -> toggleFlat(this)
                 17 -> shareWeather(this)
+                18 -> backupSettings(this)
+                19 -> restoreSettings(this)
+                20 -> toggleSmart(this, "tomorrow", "Alertă schimbare mare")
+                21 -> toggleSmart(this, "golden", "Ora de aur")
             }
             true
         }
@@ -582,6 +590,7 @@ class MainActivity : Activity() {
         add(tv("Max $mx°  ·  Min $mn°", 16f, alpha = .9f).apply { gravity = Gravity.CENTER }, 4)
         rainSoon(j)?.let { add(tv(it, 15f, alpha = .95f).apply { gravity = Gravity.CENTER }, 6) }
         addDaily(this, body, j, f)
+        addExtras5(this, body, j, f)
         // comparatie intre surse
         val cmpArr = j.optJSONArray("cmp")
         if (cmpArr != null && cmpArr.length() > 1) {
@@ -675,6 +684,7 @@ class MainActivity : Activity() {
         add(dpn, 12)
         addAir(this, body, prefs.getString("lat", "") ?: "", prefs.getString("lon", "") ?: "")
         addNormal(this, body, j, f)
+        addConfidence(this, body, f)
         add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
