@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sc_share">Partajează</string>
+    <string name="sc_share_l">Partajează vremea ca imagine</string>
+    <string name="sc_test">Test fundal</string>
+    <string name="sc_test_l">Mod test pentru fundalul animat</string>
+    <string name="sc_update">Actualizări</string>
+    <string name="sc_update_l">Caută o versiune nouă</string>
+</resources>

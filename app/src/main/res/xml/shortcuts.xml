@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="share"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/sc_share"
+        android:shortcutLongLabel="@string/sc_share_l">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="ro.vremea.wallpaper"
+            android:targetClass="ro.vremea.wallpaper.MainActivity">
+            <extra android:name="cmd" android:value="share" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="test"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/sc_test"
+        android:shortcutLongLabel="@string/sc_test_l">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="ro.vremea.wallpaper"
+            android:targetClass="ro.vremea.wallpaper.MainActivity">
+            <extra android:name="cmd" android:value="test" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="update"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/sc_update"
+        android:shortcutLongLabel="@string/sc_update_l">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="ro.vremea.wallpaper"
+            android:targetClass="ro.vremea.wallpaper.MainActivity">
+            <extra android:name="cmd" android:value="update" />
+        </intent>
+    </shortcut>
+</shortcuts>

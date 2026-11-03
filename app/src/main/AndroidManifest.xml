@@ -17,6 +17,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
         <service
             android:name=".WeatherWallpaperService"
@@ -31,6 +32,16 @@
         <service android:name=".AlertJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
         <service android:name=".SmartJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
         <service android:name=".TempJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name=".WeatherTile"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher"
+            android:label="Vremea"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <receiver android:name=".WeatherWidget" android:exported="true" android:label="Vremea Live (4×2)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
