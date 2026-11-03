@@ -128,6 +128,8 @@ class WeatherWallpaperService : WallpaperService() {
         private val air = AirFx(this@WeatherWallpaperService)
         private var locked = false
         private var lockAt = 0L
+        private val fogGlass = FogGlass()
+        private val birds = BirdFx()
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -560,6 +562,7 @@ class WeatherWallpaperService : WallpaperService() {
                 override fun onCommand(action: String?, x: Int, y: Int, z: Int, extras: Bundle?, resultRequested: Boolean): Bundle? {
             if (action == android.app.WallpaperManager.COMMAND_TAP) {
                 fx.tap(x.toFloat(), y.toFloat())
+                                fogGlass.tap(x.toFloat(), y.toFloat())
                 if (cat() == 6) nextBolt = 0L
             }
             return super.onCommand(action, x, y, z, extras, resultRequested)
@@ -1081,7 +1084,7 @@ class WeatherWallpaperService : WallpaperService() {
             paint.alpha = 255
 
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
-            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY)
+            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC)
             if (false) {
                 val hb = hillBitmap(k, bot)
                 val hox = tiltX * w * 0.03f
@@ -1268,6 +1271,8 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // vigneta fina (creata o singura data)
+                        birds.draw(c, w, h, t, day && k <= 2, hx)
+            fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
                         air.draw(c, w, h)
                         ground.draw(c, w, h, t, dtf, code, tC)
             meteors.draw(c, w, h, t, dtf, !day, k <= 1)
