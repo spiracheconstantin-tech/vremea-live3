@@ -40,7 +40,7 @@ fun scheduleSmart(ctx: Context) {
     try {
         val pr = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         val js = ctx.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        if (pr.getBoolean("morning", false) || pr.getBoolean("rainsoon", false) || pr.getBoolean("tomorrow", false) || pr.getBoolean("golden", false)) {
+        if (pr.getBoolean("morning", false) || pr.getBoolean("rainsoon", false) || pr.getBoolean("tomorrow", false) || pr.getBoolean("golden", false) || pr.getBoolean("pollen", false)) {
             val ji = JobInfo.Builder(4343, ComponentName(ctx, SmartJob::class.java))
                 .setPeriodic(30L * 60L * 1000L)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
@@ -98,6 +98,7 @@ private fun post(ctx: Context, id: Int, title: String, text: String) {
 
 private fun runSmart(ctx: Context) {
         try { runExtra(ctx) } catch (e: Exception) { }
+            try { runPollen(ctx) } catch (e: Exception) { }
     val pr = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
     val lat = pr.getString("lat", null) ?: return
     val lon = pr.getString("lon", null) ?: return
