@@ -151,6 +151,7 @@ class MainActivity : Activity() {
         setContentView(root)
         setBg(0, true)
         showCrashIfAny(this)
+                handleShortcut(this)
         if (!prefs.contains("lat")) myLocation()
     }
 
@@ -196,6 +197,7 @@ class MainActivity : Activity() {
         m.menu.add(0, 19, 18, "📥 Restaurează setările")
         m.menu.add(0, 20, 19, "📅 Alertă schimbare mare: " + (if (prefs.getBoolean("tomorrow", false)) "pornită" else "oprită"))
         m.menu.add(0, 21, 20, "📸 Ora de aur: " + (if (prefs.getBoolean("golden", false)) "pornită" else "oprită"))
+                m.menu.add(0, 22, 21, "🌿 Alertă polen: " + (if (prefs.getBoolean("pollen", false)) "pornită" else "oprită"))
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -219,6 +221,7 @@ class MainActivity : Activity() {
                 19 -> restoreSettings(this)
                 20 -> toggleSmart(this, "tomorrow", "Alertă schimbare mare")
                 21 -> toggleSmart(this, "golden", "Ora de aur")
+                22 -> toggleSmart(this, "pollen", "Alertă polen")
             }
             true
         }
@@ -685,6 +688,7 @@ class MainActivity : Activity() {
         addAir(this, body, prefs.getString("lat", "") ?: "", prefs.getString("lon", "") ?: "")
         addNormal(this, body, j, f)
         addConfidence(this, body, f)
+                addMonth(this, body, f)
         add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
