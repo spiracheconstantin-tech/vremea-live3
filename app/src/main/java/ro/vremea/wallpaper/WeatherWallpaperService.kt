@@ -100,7 +100,6 @@ class WeatherWallpaperService : WallpaperService() {
         private var moonKey = -1
         private var flakeBmp: Bitmap? = null
         private var wispBmp: Bitmap? = null
-        private var dropBmp2: Bitmap? = null
         private var glassBmp: Bitmap? = null
         private var hillBmp: Bitmap? = null
         private var hillKey = -1L
@@ -284,7 +283,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
             glass = ArrayList()
             if (k == 4 || k == 6) {
-                val gl = (5f + 14f * (intensity() / 8f).coerceIn(0f, 1f)).toInt()
+                val gl = (3f + 5f * (intensity() / 8f).coerceIn(0f, 1f)).toInt()
                 repeat(gl) {
                     glass.add(P(rnd.nextFloat() * w, rnd.nextFloat() * h * 0.9f, 0.1f + 0.7f * rnd.nextFloat(), rnd.nextFloat()))
                 }
@@ -682,42 +681,50 @@ class WeatherWallpaperService : WallpaperService() {
 
         // Nor cu volum: luminos sus, umbrit jos
         private fun cloudBitmap(col: Int): Bitmap {
-                        val cachedC = cloudBmp
-            if (cachedC != null && cloudKey == (col and 0x00FFFFFF)) return cachedC
-            val madeC = makeCloudBitmap(col)
-            cloudBmp = madeC
-            cloudKey = col and 0x00FFFFFF
-            if (madeC.width > 0) return madeC
             val key = col and 0x00FFFFFF
-            val old = cloudBmp
-            if (old != null && cloudKey == key) return old
+            val cached = cloudBmp
+            if (cached != null && cloudKey == key) return cached
+
             val bmp = Bitmap.createBitmap(440, 240, Bitmap.Config.ARGB_8888)
             val cv = Canvas(bmp)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            val puffs = arrayOf(
-                floatArrayOf(110f, 130f, 46f), floatArrayOf(165f, 100f, 58f),
-                floatArrayOf(230f, 85f, 66f), floatArrayOf(295f, 105f, 58f),
-                floatArrayOf(345f, 135f, 44f), floatArrayOf(215f, 130f, 58f),
-                floatArrayOf(145f, 140f, 46f), floatArrayOf(285f, 142f, 48f)
-            )
-            fun layer(color: Int, dx: Float, dy: Float, k: Float, blur: Float, alpha: Int, base: Boolean) {
-                p.color = color
-                p.alpha = alpha
-                p.maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
-                for (u in puffs) cv.drawCircle(u[0] + dx, u[1] + dy, u[2] * k, p)
-                if (base) cv.drawRoundRect(RectF(80f + dx, 140f + dy, 380f + dx, 185f + dy), 40f, 40f, p)
+            val silhouette = Path().apply {
+                moveTo(28f, 177f)
+                cubicTo(34f, 159f, 57f, 150f, 82f, 154f)
+                cubicTo(77f, 126f, 99f, 104f, 128f, 105f)
+                cubicTo(137f, 69f, 169f, 48f, 203f, 57f)
+                cubicTo(233f, 63f, 251f, 83f, 254f, 108f)
+                cubicTo(272f, 82f, 304f, 77f, 328f, 94f)
+                cubicTo(347f, 107f, 352f, 126f, 346f, 145f)
+                cubicTo(381f, 136f, 409f, 151f, 411f, 171f)
+                cubicTo(413f, 190f, 392f, 202f, 365f, 202f)
+                lineTo(70f, 202f)
+                cubicTo(44f, 202f, 27f, 193f, 28f, 177f)
+                close()
             }
-            layer(shade(col, 0.78f), 0f, 12f, 1f, 16f, 255, true)
-            layer(col, 0f, 0f, 1f, 9f, 255, true)
-            layer(mixWhite(col, 0.55f), -10f, -14f, 0.7f, 12f, 150, false)
-            p.maskFilter = null
-            val q = Paint(Paint.ANTI_ALIAS_FLAG)
-            q.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
-            q.shader = LinearGradient(
-                0f, 50f, 0f, 190f,
-                Color.argb(90, 255, 255, 255), Color.argb(115, 60, 80, 120), Shader.TileMode.CLAMP
-            )
-            cv.drawRect(0f, 0f, 440f, 240f, q)
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = shade(col, 0.68f)
+                maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
+            }
+            cv.save()
+            cv.translate(0f, 12f)
+            cv.drawPath(silhouette, shadowPaint)
+            cv.restore()
+
+            val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, 62f, 0f, 208f,
+                    intArrayOf(mixWhite(col, 0.28f), col, shade(col, 0.78f)),
+                    floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP
+                )
+            }
+            cv.drawPath(silhouette, body)
+
+            val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(46, 255, 255, 255)
+                maskFilter = BlurMaskFilter(18f, BlurMaskFilter.Blur.NORMAL)
+            }
+            cv.drawOval(RectF(108f, 73f, 267f, 132f), highlight)
+
             cloudBmp = bmp
             cloudKey = key
             return bmp
@@ -727,45 +734,41 @@ class WeatherWallpaperService : WallpaperService() {
             val old = flakeBmp
             if (old != null) return old
             val bmp = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = RadialGradient(
-                24f, 24f, 24f,
-                intArrayOf(Color.argb(255, 255, 255, 255), Color.argb(190, 255, 255, 255), Color.argb(0, 255, 255, 255)),
-                floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP
-            )
-            Canvas(bmp).drawCircle(24f, 24f, 24f, p)
-            flakeBmp = bmp
-            return bmp
-        }
-
-        private fun dropBitmap2(): Bitmap {
-            val old = dropBmp2
-            if (old != null) return old
-            val bmp = Bitmap.createBitmap(24, 40, Bitmap.Config.ARGB_8888)
             val cv = Canvas(bmp)
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            val path = Path()
-            path.moveTo(12f, 2f)
-            path.cubicTo(13f, 11f, 20f, 19f, 20f, 29f)
-            path.arcTo(RectF(4f, 21f, 20f, 37f), 0f, 180f)
-            path.cubicTo(4f, 19f, 11f, 11f, 12f, 2f)
-            path.close()
-            p.style = Paint.Style.FILL
-            p.shader = LinearGradient(
-                4f, 0f, 20f, 0f,
-                intArrayOf(Color.argb(150, 205, 225, 250), Color.argb(70, 205, 225, 250), Color.argb(170, 225, 238, 255)),
-                floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
-            )
-            cv.drawPath(path, p)
-            p.shader = null
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = 1.2f
-            p.color = Color.argb(200, 240, 247, 255)
-            cv.drawPath(path, p)
-            p.style = Paint.Style.FILL
-            p.color = Color.argb(230, 255, 255, 255)
-            cv.drawOval(RectF(7f, 25f, 11f, 31f), p)
-            dropBmp2 = bmp
+            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    24f, 24f, 23f,
+                    intArrayOf(Color.argb(48, 255, 255, 255), Color.argb(0, 255, 255, 255)),
+                    floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
+                )
+            }
+            cv.drawCircle(24f, 24f, 23f, glow)
+            val crystal = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 1.8f
+                strokeCap = Paint.Cap.ROUND
+            }
+            for (arm in 0 until 6) {
+                val a = arm * (Math.PI.toFloat() / 3f)
+                val ex = 24f + kotlin.math.cos(a) * 18f
+                val ey = 24f + kotlin.math.sin(a) * 18f
+                cv.drawLine(24f, 24f, ex, ey, crystal)
+                for (distance in floatArrayOf(9f, 14f)) {
+                    val bx = 24f + kotlin.math.cos(a) * distance
+                    val by = 24f + kotlin.math.sin(a) * distance
+                    for (side in floatArrayOf(-0.72f, 0.72f)) {
+                        val branch = a + side
+                        cv.drawLine(
+                            bx, by,
+                            bx + kotlin.math.cos(branch) * 5.5f,
+                            by + kotlin.math.sin(branch) * 5.5f,
+                            crystal
+                        )
+                    }
+                }
+            }
+            flakeBmp = bmp
             return bmp
         }
 
@@ -1027,18 +1030,6 @@ class WeatherWallpaperService : WallpaperService() {
                     useShader(null)
 
                     // Halo-ul difuz și razele scurte din jurul discului păstrează aspectul solar fără fascicule pe ecran.
-
-                    // reflexii de lentila pe diagonala ecranului
-                    if (k == 0) {
-                        val ts = floatArrayOf(0.5f, 0.9f, 1.4f)
-                        val rs = floatArrayOf(0.024f, 0.014f, 0.034f)
-                        val cols = intArrayOf(Color.argb(22, 255, 240, 170), Color.argb(18, 170, 230, 255), Color.argb(14, 255, 190, 120))
-                        for (i in 0 until 3) {
-                            paint.color = cols[i]
-                            c.drawCircle(sx + (w / 2f - sx) * ts[i], sy + (h * 0.5f - sy) * ts[i], w * rs[i], paint)
-                        }
-                    }
-
                     sp.strokeWidth = w * 0.0045f
                     for (i in 0 until 14) {
                         val a = t * 0.04f + i * (2f * PI.toFloat() / 14f)
@@ -1073,17 +1064,17 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawRect(-w * 0.3f, h * 0.12f, w * 1.3f, h * 0.30f, paint)
                     useShader(null)
                     c.restore()
-                        for (i in 0 until (if (showStars) 140 else 0)) {
+                        for (i in 0 until (if (showStars) 105 else 0)) {
                         val x = ((i * 7919) % 1000) / 1000f * w
                         val y = ((i * 104729) % 1000) / 1000f * h * 0.62f
-                        val big = i % 9 == 0
-                        val tw = 0.5f + 0.5f * sin(t * (1.2f + (i % 5) * 0.4f) + i)
-                        paint.color = Color.argb((80 + 160 * tw).toInt(), 255, if (i % 4 == 0) 232 else 255, if (i % 7 == 0) 205 else 255)
-                        c.drawCircle(x, y, (0.7f + (i % 3) * 0.6f + (if (big) 0.9f else 0f)) * (0.8f + 0.4f * tw), paint)
+                        val big = i % 31 == 0
+                        val tw = 0.5f + 0.5f * sin(t * (0.25f + (i % 5) * 0.12f) + i)
+                        paint.color = Color.argb((45 + 105 * tw).toInt(), 232, 239, if (i % 7 == 0) 255 else 245)
+                        c.drawCircle(x, y, (0.45f + (i % 3) * 0.28f + (if (big) 0.35f else 0f)) * (0.9f + 0.15f * tw), paint)
                         if (big) {
-                            sp.color = Color.argb((70 * tw).toInt(), 255, 255, 255)
-                            sp.strokeWidth = 1.5f
-                            val l = 7f + 6f * tw
+                            sp.color = Color.argb((24 * tw).toInt(), 225, 235, 255)
+                            sp.strokeWidth = 1f
+                            val l = 3f + 2f * tw
                             c.drawLine(x - l, y, x + l, y, sp)
                             c.drawLine(x, y - l, x, y + l, sp)
                         }
@@ -1133,7 +1124,7 @@ class WeatherWallpaperService : WallpaperService() {
             paint.colorFilter = if (tintA > 0) PorterDuffColorFilter(Color.argb(tintA, 255, 140, 80), PorterDuff.Mode.SRC_ATOP) else null
             for (cl in clouds) {
                 val tt = ((cl.s - 0.7f) / 0.9f).coerceIn(0f, 1f)
-                val bw = 120f * cl.s * us
+                val bw = 170f * cl.s * us
                 val bh = bw * 240f / 440f
                 cl.x += cl.v * (0.8f + wspd * 3f) * hx * dtf
                 if (cl.x > w) cl.x = -bw
@@ -1142,7 +1133,12 @@ class WeatherWallpaperService : WallpaperService() {
                 val ox = tiltX * w * (0.01f + 0.035f * tt)
                 val oy = tiltY * h * (0.004f + 0.012f * tt)
                 rect.set(cl.x + ox, cl.y + oy, cl.x + bw + ox, cl.y + bh + oy)
-                c.drawBitmap(cbmp, null, rect, paint)
+                if (cl.s > 1.15f) {
+                    c.save()
+                    c.scale(-1f, 1f, rect.centerX(), rect.centerY())
+                    c.drawBitmap(cbmp, null, rect, paint)
+                    c.restore()
+                } else c.drawBitmap(cbmp, null, rect, paint)
             }
             paint.colorFilter = null
             paint.alpha = 255
@@ -1185,7 +1181,6 @@ class WeatherWallpaperService : WallpaperService() {
                 val spd = 0.85f + 0.35f * lvl
                 val szm = 0.9f + 0.25f * lvl
                 val splashP = 0.3f + 0.55f * lvl
-                val db = dropBitmap2()
                 for (p in parts) {
                     val d = p.s
                     val land = h * (0.88f + 0.11f * d)
@@ -1204,15 +1199,13 @@ class WeatherWallpaperService : WallpaperService() {
                     }
                     if (p.x > w) p.x -= w
                     if (p.x < 0f) p.x += w
-                    val bh = (12f + 20f * d) * us * lt * szm
-                    val dh = bh * (1f + 0.45f * d)
-                    val dw = bh * 0.55f * (1f - 0.18f * d)
+                    val streak = (8f + 18f * d) * us * lt * szm
                     val ang = -atan(slant / (p.v * fl * spd)) * 57.2958f
-                    paint.alpha = ((90 + 140 * d) * lt).toInt()
+                    sp.color = Color.argb(((55 + 105 * d) * lt).toInt().coerceIn(0, 180), 202, 224, 246)
+                    sp.strokeWidth = max(0.8f, (0.7f + 1.1f * d) * us)
                     c.save()
                     c.rotate(ang, p.x, p.y)
-                    rect.set(p.x - dw / 2f, p.y - dh, p.x + dw / 2f, p.y)
-                    c.drawBitmap(db, null, rect, paint)
+                    c.drawLine(p.x, p.y - streak, p.x, p.y, sp)
                     c.restore()
                 }
                 paint.alpha = 255
@@ -1242,8 +1235,8 @@ class WeatherWallpaperService : WallpaperService() {
                 for (g in glass) {
                     g.y += g.v * (0.5f + lvl) * dtf
                     if (g.y > h) { g.y = -30f; g.x = rnd.nextFloat() * w }
-                    val gr = (7f + 12f * g.s) * us
-                    paint.alpha = 215
+                    val gr = (3f + 7f * g.s) * us
+                    paint.alpha = 125
                     rect.set(g.x - gr, g.y - gr * 1.3f, g.x + gr, g.y + gr * 1.3f)
                     c.drawBitmap(gb, null, rect, paint)
                 }
@@ -1286,9 +1279,12 @@ class WeatherWallpaperService : WallpaperService() {
                     if (p.x > w) p.x -= w
                     if (p.x < 0f) p.x += w
                     val size = (6f + 20f * d) * sc * 1.8f
-                    paint.alpha = (110 + 120 * d).toInt()
+                    paint.alpha = (100 + 130 * d).toInt()
                     rect.set(p.x - size / 2f, p.y - size / 2f, p.x + size / 2f, p.y + size / 2f)
+                    c.save()
+                    c.rotate((t * 12f + d * 360f) % 360f, p.x, p.y)
                     c.drawBitmap(fb, null, rect, paint)
+                    c.restore()
                 }
                 paint.alpha = 255
                 useShader(
