@@ -126,7 +126,7 @@ class GrassFx {
     }
     private val path = Path()
     private val rnd = Random(11)
-    private val n = 70
+    private val n = 130
     private val gx = FloatArray(n)
     private val gh = FloatArray(n)
     private val gp = FloatArray(n)
@@ -140,7 +140,7 @@ class GrassFx {
             gw = w
             for (i in 0 until n) {
                 gx[i] = (i + rnd.nextFloat() * 0.8f) / n * w * 1.1f - w * 0.05f
-                gh[i] = 0.025f + 0.03f * rnd.nextFloat()
+                gh[i] = 0.018f + 0.022f * rnd.nextFloat()
                 gp[i] = rnd.nextFloat() * 6.28f
             }
         }
@@ -215,3 +215,4 @@ class ShadowFx {
         p.alpha = 255
     }
 }
+

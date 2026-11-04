@@ -961,15 +961,15 @@ class WeatherWallpaperService : WallpaperService() {
             if (k <= 1 && !flatStyle) {
                 if (day) {
                     val warm = (1f - dist / 90f).coerceIn(0f, 1f)
-                    val r = w * 0.085f * (1f + 0.4f * warm)
+                    val r = w * 0.062f * (1f + 0.22f * warm)
                     val halo = blend(0xFFFFF3B0.toInt(), 0xFFFF9A5A.toInt(), warm)
                     val hrad = w * 0.62f * (1f + 0.03f * sin(t))
                     useShader(
                         RadialGradient(
                             sx, sy, hrad,
                             intArrayOf(
-                                Color.argb(170, Color.red(halo), Color.green(halo), Color.blue(halo)),
-                                Color.argb(60, Color.red(halo), Color.green(halo), Color.blue(halo)), 0
+                                Color.argb(118, Color.red(halo), Color.green(halo), Color.blue(halo)),
+                                Color.argb(38, Color.red(halo), Color.green(halo), Color.blue(halo)), 0
                             ),
                             floatArrayOf(0f, .3f, 1f), Shader.TileMode.CLAMP
                         )
@@ -985,11 +985,11 @@ class WeatherWallpaperService : WallpaperService() {
                             rayKey = rk
                         }
                         paint.shader = rayShader
-                        paint.alpha = (150 * (1f - cloud / 120f)).toInt().coerceIn(30, 150)
-                        val len = h * 0.9f
+                        paint.alpha = (72 * (1f - cloud / 120f)).toInt().coerceIn(12, 72)
+                        val len = h * 0.48f
                         for (i in 0 until 6) {
                             val ang = PI.toFloat() / 2f + (i - 2.5f) * 0.28f + sin(t * 0.15f + i) * 0.04f
-                            val spread = 0.07f + 0.02f * (i % 2)
+                            val spread = 0.035f + 0.012f * (i % 2)
                             rayPath.reset()
                             rayPath.moveTo(sx, sy)
                             rayPath.lineTo(sx + cos(ang - spread) * len, sy + sin(ang - spread) * len)
@@ -1003,7 +1003,7 @@ class WeatherWallpaperService : WallpaperService() {
                     // reflexii de lentila pe diagonala ecranului
                     if (k == 0) {
                         val ts = floatArrayOf(0.5f, 0.9f, 1.4f)
-                        val rs = floatArrayOf(0.05f, 0.03f, 0.075f)
+                        val rs = floatArrayOf(0.024f, 0.014f, 0.034f)
                         val cols = intArrayOf(Color.argb(22, 255, 240, 170), Color.argb(18, 170, 230, 255), Color.argb(14, 255, 190, 120))
                         for (i in 0 until 3) {
                             paint.color = cols[i]
@@ -1011,22 +1011,22 @@ class WeatherWallpaperService : WallpaperService() {
                         }
                     }
 
-                    sp.strokeWidth = w * 0.012f
+                    sp.strokeWidth = w * 0.0045f
                     for (i in 0 until 14) {
                         val a = t * 0.04f + i * (2f * PI.toFloat() / 14f)
-                        val len = if (i % 2 == 0) 2.6f else 2.0f
-                        sp.color = Color.argb(if (i % 2 == 0) 42 else 26, 255, 244, 190)
+                        val len = if (i % 2 == 0) 1.52f else 1.34f
+                        sp.color = Color.argb(if (i % 2 == 0) 25 else 14, 255, 246, 220)
                         c.drawLine(sx + cos(a) * r * 1.4f, sy + sin(a) * r * 1.4f, sx + cos(a) * r * len, sy + sin(a) * r * len, sp)
                     }
                     useShader(
                         RadialGradient(
                             sx - r * .3f, sy - r * .3f, r * 1.35f,
                             intArrayOf(
-                                0xFFFFFFF0.toInt(),
-                                blend(0xFFFFE680.toInt(), 0xFFFF8A3D.toInt(), warm),
-                                blend(0xFFFFC43D.toInt(), 0xFFE8431C.toInt(), warm)
+                                0xFFFFFDF4.toInt(),
+                                blend(0xFFFFF0C4.toInt(), 0xFFFFB56E.toInt(), warm),
+                                blend(0xFFFFD985.toInt(), 0xFFE98754.toInt(), warm)
                             ),
-                            floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP
+                            floatArrayOf(0f, .68f, 1f), Shader.TileMode.CLAMP
                         )
                     )
                     c.drawCircle(sx, sy, r, paint)
@@ -1336,6 +1336,8 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
+
 
 
 
