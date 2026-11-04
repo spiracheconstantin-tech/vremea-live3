@@ -134,6 +134,10 @@ class WeatherWallpaperService : WallpaperService() {
         private val butterflies = ButterflyFx()
         private val grass = GrassFx()
         private val shadows = ShadowFx()
+        private val lake = LakeFx()
+        private val planets = PlanetFx()
+        private val stormGlow = StormGlowFx()
+        private val weatherTransition = WeatherTransitionFx()
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -1270,6 +1274,7 @@ class WeatherWallpaperService : WallpaperService() {
                 }
                 if (flash > 0.02f) {
                     c.drawColor(Color.argb((flash * 140).toInt(), 255, 255, 255))
+                    stormGlow.draw(c, w, h, flash, cloud)
                     flash *= 0.82f.pow(dtf)
                 }
             }
@@ -1278,6 +1283,9 @@ class WeatherWallpaperService : WallpaperService() {
             shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
             butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
             grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
+            planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
+            lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd)
+            weatherTransition.draw(c, w, h, k, dtf, day)
             // vigneta fina (creata o singura data)
                         birds.draw(c, w, h, t, day && k <= 2, hx)
             fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
