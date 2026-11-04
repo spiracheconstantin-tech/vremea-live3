@@ -130,6 +130,10 @@ class WeatherWallpaperService : WallpaperService() {
         private var lockAt = 0L
         private val fogGlass = FogGlass()
         private val birds = BirdFx()
+        private val aurora = AuroraFx()
+        private val butterflies = ButterflyFx()
+        private val grass = GrassFx()
+        private val shadows = ShadowFx()
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -1270,6 +1274,10 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
+            aurora.draw(c, w, h, t, dtf, !day && k == 0 && cloud < 20 && tC < 14f)
+            shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
+            butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
+            grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
             // vigneta fina (creata o singura data)
                         birds.draw(c, w, h, t, day && k <= 2, hx)
             fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
@@ -1292,3 +1300,4 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
