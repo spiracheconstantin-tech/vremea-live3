@@ -139,7 +139,7 @@ class WeatherWallpaperService : WallpaperService() {
         private val stormGlow = StormGlowFx()
         private val weatherTransition = WeatherTransitionFx()
         private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key?.startsWith("wp_fx_") == true) {
+            if (key?.startsWith("wp_fx_") == true || key == "wp_scene") {
                 handler.removeCallbacks(reloadFxSettings)
                 handler.postDelayed(reloadFxSettings, 180L)
             } else if (key == "test" || key == "test_min") {
@@ -163,6 +163,7 @@ class WeatherWallpaperService : WallpaperService() {
         private var fxPlanets = true
         private var fxStormGlow = true
         private var fxWeatherTransition = true
+        private var scene = 0
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -259,6 +260,7 @@ class WeatherWallpaperService : WallpaperService() {
             fxPlanets = ap0.getBoolean("wp_fx_planets", true)
             fxStormGlow = ap0.getBoolean("wp_fx_storm_glow", true)
             fxWeatherTransition = ap0.getBoolean("wp_fx_transition", true)
+            scene = ap0.getInt("wp_scene", 0).coerceIn(0, 2)
                         flatStyle = ap0.getBoolean("wp_flat", false)
             val n = when (k) {
                 4, 6 -> rainN()
@@ -1130,7 +1132,7 @@ class WeatherWallpaperService : WallpaperService() {
             paint.alpha = 255
 
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
-            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC)
+            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC, scene)
             if (false) {
                 val hb = hillBitmap(k, bot)
                 val hox = tiltX * w * 0.03f
@@ -1322,7 +1324,7 @@ class WeatherWallpaperService : WallpaperService() {
             if (fxButterflies) butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
             if (fxGrass) grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
             if (fxPlanets) planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
-            if (fxLake) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd)
+            if (fxLake && scene != 1) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd, scene, (sx / w).coerceIn(0f, 1f))
             if (fxWeatherTransition) weatherTransition.draw(c, w, h, k, dtf, day)
             // vigneta fina (creata o singura data)
                         birds.draw(c, w, h, t, day && k <= 2, hx)
@@ -1346,6 +1348,8 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
+
 
 
 

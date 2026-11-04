@@ -60,7 +60,7 @@ class MainActivity : Activity() {
 
     private fun tv(t: String, size: Float, bold: Boolean = false, alpha: Float = 1f) = TextView(this).apply {
         text = t
-        textSize = size
+        textSize = size * prefs.getFloat("text_scale", 1f)
         setTextColor(Color.WHITE)
         this.alpha = alpha
         if (bold) setTypeface(typeface, Typeface.BOLD)
@@ -199,6 +199,11 @@ class MainActivity : Activity() {
         m.menu.add(0, 21, 20, "📸 Ora de aur: " + (if (prefs.getBoolean("golden", false)) "pornită" else "oprită"))
                 m.menu.add(0, 22, 21, "🌿 Alertă polen: " + (if (prefs.getBoolean("pollen", false)) "pornită" else "oprită"))
         m.menu.add(0, 23, 22, "✨ Efecte fundal animat")
+        m.menu.add(0, 24, 23, "⚠️ Avertizări oficiale MeteoAlarm")
+        m.menu.add(0, 25, 24, "🌧️ Radar precipitații · ultimele 2 ore")
+        val textScale = prefs.getFloat("text_scale", 1f)
+        m.menu.add(0, 26, 25, "🔠 Mărime text: " + (if (textScale < 1.1f) "normală" else if (textScale < 1.25f) "mare" else "foarte mare"))
+        m.menu.add(0, 27, 26, "🏞️ Peisaj wallpaper")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -224,6 +229,10 @@ class MainActivity : Activity() {
                 21 -> toggleSmart(this, "golden", "Ora de aur")
                 22 -> toggleSmart(this, "pollen", "Alertă polen")
                 23 -> wallpaperFxSettings(this)
+                24 -> showOfficialWeatherAlerts(this, prefs.getString("name", "") ?: "")
+                25 -> showRadarMap(this, prefs.getString("lat", null)?.toDoubleOrNull() ?: 44.4268, prefs.getString("lon", null)?.toDoubleOrNull() ?: 26.1025)
+                26 -> { val current = prefs.getFloat("text_scale", 1f); val next = if (current < 1.1f) 1.15f else if (current < 1.25f) 1.3f else 1f; prefs.edit().putFloat("text_scale", next).apply(); load() }
+                27 -> chooseWallpaperScene(this)
             }
             true
         }
@@ -691,7 +700,19 @@ class MainActivity : Activity() {
         addNormal(this, body, j, f)
         addConfidence(this, body, f)
                 addMonth(this, body, f)
-        add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
+        val sourceLabel = j.optString("src", "Open-Meteo")
+        val footerLabel = if (sourceLabel.startsWith("Date salvate")) "Date: $sourceLabel" else {
+            val cacheAt = getSharedPreferences("cache", Context.MODE_PRIVATE).getLong("at", 0L)
+            val freshness = if (cacheAt > 0L) "Actualizat la " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date(cacheAt)) else "Actualizare necunoscută"
+            "Date: $sourceLabel · $freshness"
+        }
+        add(tv(footerLabel, 11f, alpha = .72f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
+
+
+
+
+
+
 

@@ -57,9 +57,7 @@ private fun timeDialog(a: Activity) {
     sb.max = 1439
     sb.progress = start
     sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-        override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
-            tv.text = fmtMin(p)
-        }
+        override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) { tv.text = fmtMin(p) }
         override fun onStartTrackingTouch(s: SeekBar?) {}
         override fun onStopTrackingTouch(s: SeekBar?) {}
     })
@@ -68,9 +66,12 @@ private fun timeDialog(a: Activity) {
     AlertDialog.Builder(a).setTitle("Ora pentru test (răsărit 07:00, apus 19:00)").setView(box)
         .setPositiveButton("Aplică") { _, _ ->
             pr.edit().putInt("test_min", sb.progress).apply()
-            Toast.makeText(a, "Ora ${fmtMin(sb.progress)}. Ieși pe ecranul de start.", Toast.LENGTH_LONG).show()
+            Toast.makeText(a, "Ora de test setată la ${fmtMin(sb.progress)}.", Toast.LENGTH_LONG).show()
         }
-        .setNeutralButton("Ora scenariului") { _, _ -> pr.edit().putInt("test_min", -1).apply() }
+        .setNeutralButton("Ora scenariului") { _, _ ->
+            pr.edit().putInt("test_min", -1).apply()
+            Toast.makeText(a, "Ora scenariului aplicată.", Toast.LENGTH_SHORT).show()
+        }
         .setNegativeButton("Anulează", null).show()
 }
 
@@ -81,7 +82,7 @@ fun testMode(a: Activity) {
             timeDialog(a)
         } else {
             a.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putInt("test", i - 1).apply()
-            Toast.makeText(a, if (i == 0) "Test oprit" else "Test pornit: ieși pe ecranul de start", Toast.LENGTH_LONG).show()
+            Toast.makeText(a, if (i == 0) "Test oprit; se încarcă vremea reală." else "Scenariu activ: ${TestMode.list[i - 1].name}.", Toast.LENGTH_LONG).show()
         }
     }.show()
 }

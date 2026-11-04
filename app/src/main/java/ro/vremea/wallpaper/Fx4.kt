@@ -14,8 +14,8 @@ internal class LakeFx {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
 
-    fun draw(c: Canvas, w: Float, h: Float, t: Float, day: Boolean, cloudy: Int, wet: Boolean, wind: Float) {
-        val y0 = h * 0.925f
+    fun draw(c: Canvas, w: Float, h: Float, t: Float, day: Boolean, cloudy: Int, wet: Boolean, wind: Float, scene: Int = 0, lightX: Float = .5f) {
+        val y0 = if (scene == 2) h * 0.89f else h * 0.925f
         p.shader = android.graphics.LinearGradient(
             0f, y0, 0f, h,
             intArrayOf(Color.argb(0, 75, 135, 175), Color.argb(if (day) 68 else 105, 65, 110, 155), Color.argb(if (day) 115 else 145, 18, 40, 75)),
@@ -23,11 +23,11 @@ internal class LakeFx {
         )
         c.drawRect(0f, y0, w, h, p)
         p.shader = null
-        val alpha = (if (day) 42 else 60) * (100 - cloudy.coerceIn(0, 100)) / 100
+        val alpha = (if (day) 52 else 68) * (100 - cloudy.coerceIn(0, 100)) / 100
         for (i in 0 until 16) {
             val yy = y0 + (i + 1) * (h - y0) / 18f
             val phase = t * (0.7f + wind * 1.8f) + i * 1.7f
-            val cx = w * (0.5f + 0.12f * sin(phase * 0.22f))
+            val cx = w * lightX + w * 0.08f * sin(phase * 0.22f)
             val span = w * (0.025f + (i % 5) * 0.012f)
             p.color = Color.argb((alpha * (1f - i / 20f)).toInt(), 210, 225, 245)
             p.strokeWidth = max(1f, h / 1200f)
@@ -107,5 +107,7 @@ internal class WeatherTransitionFx {
         p.alpha = 255
     }
 }
+
+
 
 

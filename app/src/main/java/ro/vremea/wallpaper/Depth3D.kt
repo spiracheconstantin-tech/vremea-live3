@@ -49,14 +49,14 @@ class Hills3D {
 
     fun draw(
         c: Canvas, paint: Paint, w: Float, h: Float, k: Int, bot: Int, day: Boolean,
-        tx: Float, ty: Float, t: Float, wspd: Float, hx: Float, tC: Float
+        tx: Float, ty: Float, t: Float, wspd: Float, hx: Float, tC: Float, scene: Int = 0
     ) {
         val bw = max(1, (w * 1.2f).toInt())
         val bh = max(1, (h * 0.24f).toInt())
-        val kk = (k * 2 + (if (day) 1 else 0)).toLong() * 100000000L + w.toLong() * 10000L + h.toLong()
+        val kk = (k * 2 + (if (day) 1 else 0)).toLong() * 100000000L + w.toLong() * 10000L + h.toLong() + scene
         if (key != kk) {
             build(bw, bh, k, bot, day)
-            genTrees(bw, bh)
+            genTrees(bw, bh, scene)
             key = kk
         }
         paint.shader = null
@@ -71,12 +71,12 @@ class Hills3D {
             val oy = ty * h * (0.004f + 0.008f * l) + h * 0.02f
             val top = h - bh + oy
             c.drawBitmap(b, ox, top, paint)
-            if (l == 1) drawHouses(c, ox, top, bhf, bw, day, tC, t, wspd, hx, bot)
+            if (l == 1 && scene == 0) drawHouses(c, ox, top, bhf, bw, day, tC, t, wspd, hx, bot)
             if (l == 2) drawTrees(c, ox, top, bhf, k, day, mo, t, wspd, hx)
         }
     }
 
-    private fun genTrees(bw: Int, bh: Int) {
+    private fun genTrees(bw: Int, bh: Int, scene: Int) {
         val bwf = bw.toFloat()
         val bhf = bh.toFloat()
         trN = 0
@@ -88,7 +88,7 @@ class Hills3D {
             trH[trN] = bhf * (0.12f + 0.11f * ((seed % 100) / 100f))
             trV[trN] = (seed / 100) % 12
             trN++
-            x += 42f + (seed % 40)
+            x += when (scene) { 1 -> 24f + (seed % 22); 2 -> 62f + (seed % 38); else -> 42f + (seed % 40) }
         }
     }
 
@@ -255,4 +255,6 @@ class Hills3D {
         }
     }
 }
+
+
 
