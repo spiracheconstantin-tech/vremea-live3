@@ -139,7 +139,7 @@ class WeatherWallpaperService : WallpaperService() {
         private val stormGlow = StormGlowFx()
         private val weatherTransition = WeatherTransitionFx()
         private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key?.startsWith("wp_fx_") == true || key == "wp_scene") {
+            if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion") {
                 handler.removeCallbacks(reloadFxSettings)
                 handler.postDelayed(reloadFxSettings, 180L)
             } else if (key == "test" || key == "test_min") {
@@ -147,7 +147,7 @@ class WeatherWallpaperService : WallpaperService() {
                 handler.postDelayed(reloadTestMode, 120L)
             }
         }
-        private val reloadFxSettings = Runnable { if (visible) init() }
+        private val reloadFxSettings = Runnable { if (visible) { init(); if (reduceMotion) sm.unregisterListener(tiltL) else sm.registerListener(tiltL, sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME) } }
         private val reloadTestMode = Runnable {
             if (visible) {
                 lastLoadKey = ""
@@ -164,6 +164,7 @@ class WeatherWallpaperService : WallpaperService() {
         private var fxStormGlow = true
         private var fxWeatherTransition = true
         private var scene = 0
+        private var reduceMotion = false
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -176,8 +177,10 @@ class WeatherWallpaperService : WallpaperService() {
         private val sm by lazy { getSystemService(SENSOR_SERVICE) as SensorManager }
         private val tiltL = object : SensorEventListener {
             override fun onSensorChanged(e: SensorEvent) {
-                tgX = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
-                tgY = (e.values[2] / 9.81f - 0.4f).coerceIn(-1f, 1f)
+                if (!reduceMotion) {
+                    tgX = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
+                    tgY = (e.values[2] / 9.81f - 0.4f).coerceIn(-1f, 1f)
+                }
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
         }
@@ -250,6 +253,8 @@ class WeatherWallpaperService : WallpaperService() {
             val bi = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
             val lvl = if (bi != null) bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) * 100 / max(1, bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)) else 100
             if (pmgr.isPowerSaveMode || lvl < 20) frameMs = 33L
+            reduceMotion = ap0.getBoolean("wp_reduce_motion", false)
+            if (reduceMotion) frameMs = max(frameMs, 66L)
             showStars = ap0.getBoolean("wp_stars", true)
             showHillsV = ap0.getBoolean("wp_hills", true)
             fxAurora = ap0.getBoolean("wp_fx_aurora", true)
@@ -589,7 +594,7 @@ class WeatherWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(v: Boolean) {
             visible = v
-                        if (v) {
+                        if (v && !reduceMotion) {
                 sm.registerListener(tiltL, sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME)
             } else {
                 sm.unregisterListener(tiltL)
@@ -597,7 +602,12 @@ class WeatherWallpaperService : WallpaperService() {
             handler.removeCallbacks(tick)
             handler.removeCallbacks(refresh)
             lastMs = 0L
-            if (v) { init(); handler.post(refresh); handler.post(tick) }
+            if (v) {
+                init()
+                if (reduceMotion) sm.unregisterListener(tiltL)
+                handler.post(refresh)
+                handler.post(tick)
+            }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {

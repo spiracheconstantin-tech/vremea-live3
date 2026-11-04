@@ -204,6 +204,7 @@ class MainActivity : Activity() {
         val textScale = prefs.getFloat("text_scale", 1f)
         m.menu.add(0, 26, 25, "🔠 Mărime text: " + (if (textScale < 1.1f) "normală" else if (textScale < 1.25f) "mare" else "foarte mare"))
         m.menu.add(0, 27, 26, "🏞️ Peisaj wallpaper")
+        m.menu.add(0, 28, 27, "🫧 Mișcare redusă wallpaper: " + (if (prefs.getBoolean("wp_reduce_motion", false)) "pornită" else "oprită"))
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -233,6 +234,7 @@ class MainActivity : Activity() {
                 25 -> showRadarMap(this, prefs.getString("lat", null)?.toDoubleOrNull() ?: 44.4268, prefs.getString("lon", null)?.toDoubleOrNull() ?: 26.1025)
                 26 -> { val current = prefs.getFloat("text_scale", 1f); val next = if (current < 1.1f) 1.15f else if (current < 1.25f) 1.3f else 1f; prefs.edit().putFloat("text_scale", next).apply(); load() }
                 27 -> chooseWallpaperScene(this)
+                28 -> { val enabled = !prefs.getBoolean("wp_reduce_motion", false); prefs.edit().putBoolean("wp_reduce_motion", enabled).apply(); toast(if (enabled) "Mișcare redusă activată" else "Mișcare redusă oprită") }
             }
             true
         }
@@ -633,7 +635,7 @@ class MainActivity : Activity() {
             Triple("💧 Umiditate", "${cur.getInt("relative_humidity_2m")}%", "Aer relativ"),
             Triple("🧭 Presiune", "${cur.getDouble("pressure_msl").roundToInt()} hPa", "La nivelul mării"),
             Triple("☁️ Nori", "${cur.getInt("cloud_cover")}%", "Acoperire"),
-            Triple("☔ Precipitații", "%.1f mm".format(Locale.US, cur.optDouble("precipitation", 0.0)), "Șanse azi: ${d.getJSONArray("precipitation_probability_max").optInt(0)}%"),
+            Triple("☔ Ploaie acum", "%.1f mm".format(Locale.US, cur.optDouble("precipitation", 0.0)), "Probabilitatea maximă azi: ${d.getJSONArray("precipitation_probability_max").optInt(0)}%"),
             Triple("🔆 Index UV", "%.1f".format(uv), uvTxt),
             Triple("🌅 Soare", "↑ " + d.getJSONArray("sunrise").getString(0).substring(11), "↓ " + d.getJSONArray("sunset").getString(0).substring(11))
         )
