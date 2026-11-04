@@ -142,9 +142,19 @@ class WeatherWallpaperService : WallpaperService() {
             if (key?.startsWith("wp_fx_") == true) {
                 handler.removeCallbacks(reloadFxSettings)
                 handler.postDelayed(reloadFxSettings, 180L)
+            } else if (key == "test" || key == "test_min") {
+                handler.removeCallbacks(reloadTestMode)
+                handler.postDelayed(reloadTestMode, 120L)
             }
         }
         private val reloadFxSettings = Runnable { if (visible) init() }
+        private val reloadTestMode = Runnable {
+            if (visible) {
+                lastLoadKey = ""
+                lastLoadAt = 0L
+                fetch()
+            }
+        }
         private var fxAurora = true
         private var fxButterflies = true
         private var fxGrass = true
@@ -1336,6 +1346,7 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
 
 
 
