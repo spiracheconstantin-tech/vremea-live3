@@ -95,6 +95,8 @@ class WeatherWallpaperService : WallpaperService() {
         private val bolt2 = ArrayList<PointF>()
         private var nextBolt = 0L
         private var cloudBmp: Bitmap? = null
+        private var photoBmp: Bitmap? = null
+        private var photoKey = -1
         private var cloudKey = 0
         private var moonBmp: Bitmap? = null
         private var moonKey = -1
@@ -935,6 +937,42 @@ class WeatherWallpaperService : WallpaperService() {
             }
         }
 
+        private fun drawWeatherPhoto(c: Canvas, k: Int): Boolean {
+            val key = if (!day) 7 else k.coerceIn(0, 6)
+            if (photoKey != key || photoBmp == null) {
+                photoBmp?.recycle()
+                val resId = when (key) {
+                    7 -> R.drawable.wp_photo_night
+                    0 -> R.drawable.wp_photo_sunny
+                    1, 2 -> R.drawable.wp_photo_cloudy
+                    3 -> R.drawable.wp_photo_fog
+                    4 -> R.drawable.wp_photo_rain
+                    5 -> R.drawable.wp_photo_snow
+                    else -> R.drawable.wp_photo_storm
+                }
+                photoBmp = BitmapFactory.decodeResource(resources, resId)
+                photoKey = key
+            }
+            val bmp = photoBmp ?: return false
+            val targetAspect = w / h
+            val imageAspect = bmp.width.toFloat() / bmp.height.toFloat()
+            val src = if (imageAspect > targetAspect) {
+                val cropW = (bmp.height * targetAspect).toInt().coerceIn(1, bmp.width)
+                val left = (bmp.width - cropW) / 2
+                Rect(left, 0, left + cropW, bmp.height)
+            } else {
+                val cropH = (bmp.width / targetAspect).toInt().coerceIn(1, bmp.height)
+                val top = (bmp.height - cropH) / 2
+                Rect(0, top, bmp.width, top + cropH)
+            }
+            paint.alpha = 255
+            paint.colorFilter = null
+            paint.shader = null
+            rect.set(0f, 0f, w, h)
+            c.drawBitmap(bmp, src, rect, paint)
+            return true
+        }
+
         private fun render(c: Canvas) {
             paint.reset()
             paint.isAntiAlias = true
@@ -975,11 +1013,12 @@ class WeatherWallpaperService : WallpaperService() {
             useShader(skyShader)
             c.drawPaint(paint)
             useShader(null)
+            val photoMode = drawWeatherPhoto(c, k)
 
             // nuanta dupa temperatura
-            if (tC < 15f) {
+            if (!photoMode && tC < 15f) {
                 c.drawColor(Color.argb(((15f - max(tC, -10f)) / 25f * 80).toInt(), 120, 170, 255))
-            } else {
+            } else if (!photoMode) {
                 c.drawColor(Color.argb(((min(tC, 38f) - 15f) / 23f * 90).toInt(), 255, 130, 50))
             }
 
@@ -996,7 +1035,7 @@ class WeatherWallpaperService : WallpaperService() {
                         sx += tiltX * w * 0.012f
             sy += tiltY * h * 0.008f
             val dist = min(abs(now - sunrise), abs(now - sunset))
-            if (k <= 2 && dist < 50) {
+            if (!photoMode && k <= 2 && dist < 50) {
                 val a = 1f - dist / 50f
                 useShader(
                     LinearGradient(
@@ -1009,8 +1048,8 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // soare / luna + stele
-                        if (k <= 1 && flatStyle) flat.draw(c, day, sx, sy, w, h, t)
-            if (k <= 1 && !flatStyle) {
+            if (!photoMode && k <= 1 && flatStyle) flat.draw(c, day, sx, sy, w, h, t)
+            if (!photoMode && k <= 1 && !flatStyle) {
                 if (day) {
                     val warm = (1f - dist / 90f).coerceIn(0f, 1f)
                     val r = w * 0.062f * (1f + 0.22f * warm)
@@ -1112,6 +1151,8 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
+            // Norii din fotografie înlocuiesc norii desenați.
+            if (!photoMode) {
             // nori cu volum si adancime, miscati dupa vant
             val cloudCol = when {
                 k == 6 -> Color.argb(190, 40, 46, 62)
@@ -1142,9 +1183,10 @@ class WeatherWallpaperService : WallpaperService() {
             }
             paint.colorFilter = null
             paint.alpha = 255
+            }
 
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
-            if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC, scene)
+            if (!photoMode && showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC, scene)
             if (false) {
                 val hb = hillBitmap(k, bot)
                 val hox = tiltX * w * 0.03f
@@ -1154,7 +1196,7 @@ class WeatherWallpaperService : WallpaperService() {
             }
 
             // ceata: val usor si fasii subtiri, scurte
-            if (k == 3) {
+            if (!photoMode && k == 3) {
                 c.drawColor(Color.argb(45, 235, 240, 245))
                 val wb = wispBitmap()
                 for (p in wisps) {
@@ -1331,20 +1373,20 @@ class WeatherWallpaperService : WallpaperService() {
                 }
             }
 
-            if (fxAurora) aurora.draw(c, w, h, t, dtf, !day && k == 0 && cloud < 20 && tC < 14f)
-            if (fxShadows) shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
-            if (fxButterflies) butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
-            if (fxGrass) grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
-            if (fxPlanets) planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
-            if (fxLake && scene != 1) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd, scene, (sx / w).coerceIn(0f, 1f))
-            if (fxWeatherTransition) weatherTransition.draw(c, w, h, k, dtf, day)
+            if (!photoMode && fxAurora) aurora.draw(c, w, h, t, dtf, !day && k == 0 && cloud < 20 && tC < 14f)
+            if (!photoMode && fxShadows) shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
+            if (!photoMode && fxButterflies) butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
+            if (!photoMode && fxGrass) grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
+            if (!photoMode && fxPlanets) planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
+            if (!photoMode && fxLake && scene != 1) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd, scene, (sx / w).coerceIn(0f, 1f))
+            if (!photoMode && fxWeatherTransition) weatherTransition.draw(c, w, h, k, dtf, day)
             // vigneta fina (creata o singura data)
-                        birds.draw(c, w, h, t, day && k <= 2, hx)
-            fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
-                        air.draw(c, w, h)
-                        ground.draw(c, w, h, t, dtf, code, tC)
-            meteors.draw(c, w, h, t, dtf, !day, k <= 1)
-            fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
+            if (!photoMode) birds.draw(c, w, h, t, day && k <= 2, hx)
+            if (!photoMode) fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
+            if (!photoMode) air.draw(c, w, h)
+            if (!photoMode) ground.draw(c, w, h, t, dtf, code, tC)
+            if (!photoMode) meteors.draw(c, w, h, t, dtf, !day, k <= 1)
+            if (!photoMode) fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
             val vk = w.toLong() * 10000L + h.toLong()
             if (vigShader == null || vigKey != vk) {
                 vigShader = RadialGradient(
