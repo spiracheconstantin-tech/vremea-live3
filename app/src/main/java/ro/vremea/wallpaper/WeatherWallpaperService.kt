@@ -68,7 +68,6 @@ class WeatherWallpaperService : WallpaperService() {
             strokeJoin = Paint.Join.ROUND
         }
         private val rect = RectF()
-        private val rayPath = Path()
         private val rnd = Random(System.nanoTime())
         private val showHills = true
         private var visible = false
@@ -115,8 +114,6 @@ class WeatherWallpaperService : WallpaperService() {
         private var skyKey = -1L
         private var vigShader: Shader? = null
         private var vigKey = -1L
-        private var rayShader: Shader? = null
-        private var rayKey = -1L
         private var lastMs = 0L
         private var dtf = 1f
         private val fx = LifeFx()
@@ -999,28 +996,7 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawCircle(sx, sy, hrad, paint)
                     useShader(null)
 
-                    // raze de lumina care pornesc din soare
-                    if (k == 0 || cloud < 60) {
-                        val rk = (sx / 6f).toInt().toLong() * 10000L + (sy / 6f).toInt().toLong()
-                        if (rayShader == null || rayKey != rk) {
-                            rayShader = RadialGradient(sx, sy, h * 0.85f, Color.argb(60, 255, 244, 200), 0, Shader.TileMode.CLAMP)
-                            rayKey = rk
-                        }
-                        paint.shader = rayShader
-                        paint.alpha = (72 * (1f - cloud / 120f)).toInt().coerceIn(12, 72)
-                        val len = h * 0.48f
-                        for (i in 0 until 6) {
-                            val ang = PI.toFloat() / 2f + (i - 2.5f) * 0.28f + sin(t * 0.15f + i) * 0.04f
-                            val spread = 0.035f + 0.012f * (i % 2)
-                            rayPath.reset()
-                            rayPath.moveTo(sx, sy)
-                            rayPath.lineTo(sx + cos(ang - spread) * len, sy + sin(ang - spread) * len)
-                            rayPath.lineTo(sx + cos(ang + spread) * len, sy + sin(ang + spread) * len)
-                            rayPath.close()
-                            c.drawPath(rayPath, paint)
-                        }
-                        useShader(null)
-                    }
+                    // Halo-ul difuz și razele scurte din jurul discului păstrează aspectul solar fără fascicule pe ecran.
 
                     // reflexii de lentila pe diagonala ecranului
                     if (k == 0) {
