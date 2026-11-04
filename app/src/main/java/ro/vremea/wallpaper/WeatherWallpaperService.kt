@@ -147,6 +147,7 @@ class WeatherWallpaperService : WallpaperService() {
         private val reloadFxSettings = Runnable { if (visible) { init(); if (reduceMotion) sm.unregisterListener(tiltL) else sm.registerListener(tiltL, sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME) } }
         private val reloadTestMode = Runnable {
             if (visible) {
+                if (TestMode.read(this@WeatherWallpaperService) == null) restoreLastRealWeather()
                 lastLoadKey = ""
                 lastLoadAt = 0L
                 fetch()
@@ -318,6 +319,32 @@ class WeatherWallpaperService : WallpaperService() {
         private var lastLoadAt = 0L
         private var lastLoadKey = ""
 
+        private fun saveLastRealWeather() {
+            getSharedPreferences("app", MODE_PRIVATE).edit()
+                .putInt("wp_real_code", code).putString("wp_real_temp", temp.toString())
+                .putString("wp_real_wind", wind.toString()).putString("wp_real_wind_dir", windDir.toString())
+                .putInt("wp_real_cloud", cloud).putString("wp_real_precip", precip.toString())
+                .putBoolean("wp_real_day", day).putBoolean("wp_real_fahr", fahr)
+                .putInt("wp_real_utc_off", utcOff).putInt("wp_real_sunrise", sunrise).putInt("wp_real_sunset", sunset)
+                .apply()
+        }
+
+        private fun restoreLastRealWeather() {
+            val p = getSharedPreferences("app", MODE_PRIVATE)
+            if (!p.contains("wp_real_code")) return
+            code = p.getInt("wp_real_code", 0)
+            temp = p.getString("wp_real_temp", "15")?.toDoubleOrNull() ?: 15.0
+            wind = p.getString("wp_real_wind", "5")?.toDoubleOrNull() ?: 5.0
+            windDir = p.getString("wp_real_wind_dir", "270")?.toDoubleOrNull() ?: 270.0
+            cloud = p.getInt("wp_real_cloud", 0)
+            precip = p.getString("wp_real_precip", "0")?.toDoubleOrNull() ?: 0.0
+            day = p.getBoolean("wp_real_day", true)
+            fahr = p.getBoolean("wp_real_fahr", false)
+            utcOff = p.getInt("wp_real_utc_off", 0)
+            sunrise = p.getInt("wp_real_sunrise", 360)
+            sunset = p.getInt("wp_real_sunset", 1080)
+            handler.post { init() }
+        }
         private fun httpGet(u: String, ua: String? = null): String {
             val conn = URL(u).openConnection().apply {
                 connectTimeout = 10000
@@ -483,6 +510,7 @@ class WeatherWallpaperService : WallpaperService() {
                     cloud = mean({ it.cl }, base.cl).roundToInt()
                     precip = mean({ it.pr }, base.pr)
                     code = newCode
+                    saveLastRealWeather()
                     handler.post { init() }
                 } catch (e: Exception) {
                     lastLoadAt = 0L
@@ -518,6 +546,7 @@ class WeatherWallpaperService : WallpaperService() {
                     wind = cur.getDouble("wind_speed_10m")
                     windDir = cur.optDouble("wind_direction_10m", 270.0)
                     day = cur.getInt("is_day") == 1
+                    saveLastRealWeather()
                     handler.post { init() }
                 } catch (e: Exception) {
                     // fara internet: pastreaza ultima stare
@@ -600,6 +629,7 @@ class WeatherWallpaperService : WallpaperService() {
             handler.removeCallbacks(refresh)
             lastMs = 0L
             if (v) {
+                if (TestMode.read(this@WeatherWallpaperService) == null) restoreLastRealWeather()
                 init()
                 if (reduceMotion) sm.unregisterListener(tiltL)
                 handler.post(refresh)

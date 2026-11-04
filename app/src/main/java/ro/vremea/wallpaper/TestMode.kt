@@ -81,8 +81,10 @@ fun testMode(a: Activity) {
         if (i == names.size - 1) {
             timeDialog(a)
         } else {
-            a.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putInt("test", i - 1).apply()
-            Toast.makeText(a, if (i == 0) "Test oprit; se încarcă vremea reală." else "Scenariu activ: ${TestMode.list[i - 1].name}.", Toast.LENGTH_LONG).show()
+            val editor = a.getSharedPreferences("app", Context.MODE_PRIVATE).edit()
+            if (i == 0) editor.remove("test").remove("test_min").apply()
+            else editor.putInt("test", i - 1).apply()
+            Toast.makeText(a, if (i == 0) "Test oprit; se reafișează vremea reală." else "Scenariu activ: ${TestMode.list[i - 1].name}.", Toast.LENGTH_LONG).show()
         }
     }.show()
 }
