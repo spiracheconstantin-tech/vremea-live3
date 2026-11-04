@@ -198,6 +198,7 @@ class MainActivity : Activity() {
         m.menu.add(0, 20, 19, "📅 Alertă schimbare mare: " + (if (prefs.getBoolean("tomorrow", false)) "pornită" else "oprită"))
         m.menu.add(0, 21, 20, "📸 Ora de aur: " + (if (prefs.getBoolean("golden", false)) "pornită" else "oprită"))
                 m.menu.add(0, 22, 21, "🌿 Alertă polen: " + (if (prefs.getBoolean("pollen", false)) "pornită" else "oprită"))
+        m.menu.add(0, 23, 22, "✨ Efecte fundal animat")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> searchDialog()
@@ -222,6 +223,7 @@ class MainActivity : Activity() {
                 20 -> toggleSmart(this, "tomorrow", "Alertă schimbare mare")
                 21 -> toggleSmart(this, "golden", "Ora de aur")
                 22 -> toggleSmart(this, "pollen", "Alertă polen")
+                23 -> wallpaperFxSettings(this)
             }
             true
         }
@@ -692,3 +694,4 @@ class MainActivity : Activity() {
         add(tv("Date: " + j.optString("src", "Open-Meteo"), 11f, alpha = .6f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
+

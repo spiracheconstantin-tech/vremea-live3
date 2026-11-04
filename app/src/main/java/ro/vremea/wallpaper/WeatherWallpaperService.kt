@@ -138,6 +138,21 @@ class WeatherWallpaperService : WallpaperService() {
         private val planets = PlanetFx()
         private val stormGlow = StormGlowFx()
         private val weatherTransition = WeatherTransitionFx()
+        private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key?.startsWith("wp_fx_") == true) {
+                handler.removeCallbacks(reloadFxSettings)
+                handler.postDelayed(reloadFxSettings, 180L)
+            }
+        }
+        private val reloadFxSettings = Runnable { if (visible) init() }
+        private var fxAurora = true
+        private var fxButterflies = true
+        private var fxGrass = true
+        private var fxShadows = true
+        private var fxLake = true
+        private var fxPlanets = true
+        private var fxStormGlow = true
+        private var fxWeatherTransition = true
         private val hills3 = Hills3D()
         private var qMul = 1f
         private var frameMs = 16L
@@ -226,6 +241,14 @@ class WeatherWallpaperService : WallpaperService() {
             if (pmgr.isPowerSaveMode || lvl < 20) frameMs = 33L
             showStars = ap0.getBoolean("wp_stars", true)
             showHillsV = ap0.getBoolean("wp_hills", true)
+            fxAurora = ap0.getBoolean("wp_fx_aurora", true)
+            fxButterflies = ap0.getBoolean("wp_fx_butterflies", true)
+            fxGrass = ap0.getBoolean("wp_fx_grass", true)
+            fxShadows = ap0.getBoolean("wp_fx_shadows", true)
+            fxLake = ap0.getBoolean("wp_fx_lake", true)
+            fxPlanets = ap0.getBoolean("wp_fx_planets", true)
+            fxStormGlow = ap0.getBoolean("wp_fx_storm_glow", true)
+            fxWeatherTransition = ap0.getBoolean("wp_fx_transition", true)
                         flatStyle = ap0.getBoolean("wp_flat", false)
             val n = when (k) {
                 4, 6 -> rainN()
@@ -542,6 +565,10 @@ class WeatherWallpaperService : WallpaperService() {
             }
         }
 
+        override fun onCreate(surfaceHolder: SurfaceHolder) {
+            super.onCreate(surfaceHolder)
+            getSharedPreferences("app", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(fxPrefsListener)
+        }
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
             w = width.toFloat(); h = height.toFloat()
@@ -576,6 +603,7 @@ class WeatherWallpaperService : WallpaperService() {
             return super.onCommand(action, x, y, z, extras, resultRequested)
         }
         override fun onDestroy() {
+            getSharedPreferences("app", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(fxPrefsListener)
             handler.removeCallbacksAndMessages(null)
             super.onDestroy()
         }
@@ -1274,18 +1302,18 @@ class WeatherWallpaperService : WallpaperService() {
                 }
                 if (flash > 0.02f) {
                     c.drawColor(Color.argb((flash * 140).toInt(), 255, 255, 255))
-                    stormGlow.draw(c, w, h, flash, cloud)
+                    if (fxStormGlow) stormGlow.draw(c, w, h, flash, cloud)
                     flash *= 0.82f.pow(dtf)
                 }
             }
 
-            aurora.draw(c, w, h, t, dtf, !day && k == 0 && cloud < 20 && tC < 14f)
-            shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
-            butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
-            grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
-            planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
-            lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd)
-            weatherTransition.draw(c, w, h, k, dtf, day)
+            if (fxAurora) aurora.draw(c, w, h, t, dtf, !day && k == 0 && cloud < 20 && tC < 14f)
+            if (fxShadows) shadows.draw(c, w, h, t, dtf, k <= 2 && cloud >= 15, hx, wspd)
+            if (fxButterflies) butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
+            if (fxGrass) grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
+            if (fxPlanets) planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
+            if (fxLake) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd)
+            if (fxWeatherTransition) weatherTransition.draw(c, w, h, k, dtf, day)
             // vigneta fina (creata o singura data)
                         birds.draw(c, w, h, t, day && k <= 2, hx)
             fogGlass.draw(c, w, h, dtf, k == 3 || (k == 4 && tC < 9f))
@@ -1308,4 +1336,7 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
+
+
 

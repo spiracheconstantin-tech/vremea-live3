@@ -106,7 +106,7 @@ class Hills3D {
             c.translate(ox + x, oy + ry(2, x, bhf) + 2f)
             c.rotate(sway)
             p.style = Paint.Style.FILL
-            if (trV[i] % 3 == 0) {
+            if (trV[i] % 5 == 0 || trV[i] % 5 == 3) {
                 var col = mix(0xFF2D6A3E.toInt(), Color.BLACK, night)
                 if (snow) col = mix(col, Color.WHITE, 0.55f)
                 p.color = col
@@ -142,6 +142,15 @@ class Hills3D {
                     c.drawCircle(0f, -th * 0.7f, th * 0.26f, p)
                     c.drawCircle(-th * 0.17f, -th * 0.55f, th * 0.2f, p)
                     c.drawCircle(th * 0.18f, -th * 0.58f, th * 0.2f, p)
+                    if (trV[i] % 4 == 1) {
+                        p.color = mix(cc, Color.WHITE, if (spring) 0.32f else 0.12f)
+                        c.drawCircle(th * 0.02f, -th * 0.82f, th * 0.17f, p)
+                    }
+                    if (spring && trV[i] % 3 == 1) {
+                        p.color = mix(0xFFF5A6C7.toInt(), Color.BLACK, night)
+                        c.drawCircle(-th * 0.12f, -th * 0.72f, max(1.2f, th * 0.045f), p)
+                        c.drawCircle(th * 0.16f, -th * 0.53f, max(1.2f, th * 0.045f), p)
+                    }
                 }
             }
             c.restore()
@@ -246,3 +255,4 @@ class Hills3D {
         }
     }
 }
+
