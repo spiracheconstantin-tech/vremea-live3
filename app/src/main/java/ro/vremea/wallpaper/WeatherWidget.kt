@@ -16,10 +16,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private class WD(
-    val name: String, val t: Double, val feels: Double, val code: Int,
-    val day: Boolean, val mx: Double, val mn: Double, val f: Boolean
-)
+private class WD( val name: String, val t: Double, val feels: Double, val code: Int, val day: Boolean, val mx: Double, val mn: Double, val f: Boolean, val rainProbability: Int, val nextChange: String, val ageMinutes: Long, val stale: Boolean )
 
 class WeatherWidget : AppWidgetProvider() {
 
@@ -85,35 +82,12 @@ class WeatherWidget : AppWidgetProvider() {
         }
 
         private fun fetch(ctx: Context): WD? {
-            try {
-                val ap = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
-                val f = ap.getString("units", "c") == "f"
-                val name = ap.getString("name", null) ?: "București"
-                val lat = ap.getString("lat", null) ?: "44.4268"
-                val lon = ap.getString("lon", null) ?: "26.1025"
-                val u = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                    "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
-                    "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto" +
-                    (if (f) "&temperature_unit=fahrenheit" else "")
-                val conn = URL(u).openConnection()
-                conn.connectTimeout = 10000
-                conn.readTimeout = 10000
-                val j = JSONObject(conn.getInputStream().bufferedReader().readText())
-                val cur = j.getJSONObject("current")
-                val d = j.getJSONObject("daily")
-                return WD(
-                    name,
-                    cur.getDouble("temperature_2m"),
-                    cur.getDouble("apparent_temperature"),
-                    cur.getInt("weather_code"),
-                    cur.getInt("is_day") == 1,
-                    d.getJSONArray("temperature_2m_max").getDouble(0),
-                    d.getJSONArray("temperature_2m_min").getDouble(0),
-                    f
-                )
-            } catch (e: Exception) {
-                return null
-            }
+            val d = fetchCur(ctx) ?: return null
+            return WD(
+                d.name, d.t, d.feels, d.code, d.day,
+                d.dMax.firstOrNull() ?: d.t, d.dMin.firstOrNull() ?: d.t, d.f,
+                d.rainProbability, d.nextChange, d.ageMinutes, d.stale
+            )
         }
 
         private fun cat(code: Int): Int = when {
@@ -177,7 +151,12 @@ class WeatherWidget : AppWidgetProvider() {
             val temp = "${d.t.roundToInt()}°"
             val lab = label(d.code)
             val full = "Max ${d.mx.roundToInt()}° · Min ${d.mn.roundToInt()}° · Simte ${d.feels.roundToInt()}°"
-            val short = "Max ${d.mx.roundToInt()}° · Min ${d.mn.roundToInt()}°"
+            val detail = when {
+                d.stale -> "⚠ Date vechi · ${d.ageMinutes} min"
+                d.nextChange.isNotBlank() -> "☔ ${d.rainProbability}% · ${d.nextChange}"
+                else -> "Ploaie azi ${d.rainProbability}%"
+            }
+            val labelDetail = if (d.stale) "⚠ Date vechi · ${d.ageMinutes} min" else if (d.nextChange.isNotBlank()) "${lab} · ${d.nextChange}" else "${lab} · ploaie ${d.rainProbability}%"
             val aspect = wf / hf
             val shadowR = max(2f, min(wf, hf) * 0.02f)
 
@@ -195,7 +174,7 @@ class WeatherWidget : AppWidgetProvider() {
                 p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 put(c, p, nm, x2, hf * 0.44f, hf * 0.28f, mw)
                 p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-                put(c, p, lab, x2, hf * 0.80f, hf * 0.24f, mw, 230)
+                put(c, p, labelDetail, x2, hf * 0.80f, hf * 0.24f, mw, 230)
             } else if (aspect >= 1.45f) {
                 // chenar obisnuit (de exemplu 4x2 sau 3x2)
                 val m = hf * 0.10f
@@ -209,8 +188,9 @@ class WeatherWidget : AppWidgetProvider() {
                 p.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
                 put(c, p, temp, m - hf * 0.01f, hf * 0.60f, hf * 0.40f, maxW)
                 p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-                put(c, p, lab, m, hf * 0.76f, hf * 0.10f, maxW)
-                put(c, p, if (maxW > hf * 1.2f) full else short, m, hf * 0.91f, hf * 0.082f, maxW, 220)
+                put(c, p, lab, m, hf * 0.71f, hf * 0.10f, maxW)
+                put(c, p, detail, m, hf * 0.82f, hf * 0.075f, maxW, 230)
+                put(c, p, full, m, hf * 0.94f, hf * 0.065f, maxW, 210)
             } else {
                 // chenar aproape patrat (de exemplu 2x2)
                 val m = wf * 0.07f
@@ -224,9 +204,11 @@ class WeatherWidget : AppWidgetProvider() {
                 put(c, p, temp, m, hf * 0.70f, base * 0.28f, wf - 2f * m)
                 p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
                 put(c, p, lab, m, hf * 0.82f, base * 0.085f, wf - 2f * m)
-                put(c, p, short, m, hf * 0.93f, base * 0.07f, wf - 2f * m, 220)
+                put(c, p, detail, m, hf * 0.93f, base * 0.065f, wf - 2f * m, 225)
             }
             return bmp
         }
     }
 }
+
+

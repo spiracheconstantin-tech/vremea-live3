@@ -76,6 +76,13 @@ class WeatherWidgetClock : AppWidgetProvider() {
             c.drawBitmap(weatherBitmap(d.code, d.day), null, RectF(cx - isz / 2f, hf * 0.05f, cx + isz / 2f, hf * 0.05f + isz), p)
             p.textAlign = Paint.Align.CENTER
             p.setShadowLayer(4f, 0f, 2f, 0x66000000)
+            val info = when {
+                d.stale -> "⚠ Date vechi · ${d.ageMinutes} min"
+                d.nextChange.isNotBlank() -> "☔ ${d.rainProbability}% · ${d.nextChange}"
+                else -> "Ploaie azi ${d.rainProbability}%"
+            }
+            p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            wText(c, p, info, cx, hf * 0.66f, hf * 0.062f, isz * 1.8f, 230)
             p.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
             wText(c, p, "${d.t.roundToInt()}°", cx, hf * 0.80f, hf * 0.22f, isz * 1.3f)
             p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
@@ -84,3 +91,4 @@ class WeatherWidgetClock : AppWidgetProvider() {
         }
     }
 }
+

@@ -9,16 +9,18 @@ internal fun wallpaperFxSettings(context: Context) {
     val keys = arrayOf(
         "wp_fx_aurora", "wp_fx_shadows", "wp_fx_butterflies", "wp_fx_grass",
         "wp_fx_lake", "wp_fx_planets", "wp_fx_storm_glow", "wp_fx_transition",
-        "wp_fx_birds", "wp_stars", "wp_fx_lightning"
+        "wp_fx_birds", "wp_stars", "wp_fx_lightning", "wp_fx_leaves", "wp_fx_frost",
+        "wp_fx_blossoms", "wp_fx_pollen", "wp_fx_fireflies", "wp_fx_dew"
     )
     val labels = arrayOf(
         "Auroră boreală", "Umbre de nori", "Fluturi", "Iarbă în prim-plan",
         "Lac cu reflexii", "Planete noaptea", "Fulgerul luminează norii", "Tranziții line ale vremii",
-        "Păsări", "Stele", "Fulgerul propriu-zis"
+        "Păsări", "Stele", "Fulgerul propriu-zis", "Frunze de toamnă", "Brumă de dimineață",
+        "Flori de primăvară", "Polen în aer", "Licurici vara", "Rouă dimineața"
     )
     val checked = BooleanArray(keys.size) { prefs.getBoolean(keys[it], true) }
     AlertDialog.Builder(context)
-        .setTitle("Efecte fundal animat")
+        .setTitle("Efecte wallpaper și anotimpuri")
         .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
             prefs.edit().putBoolean(keys[which], isChecked).apply()
         }
@@ -54,3 +56,5 @@ private fun showWallpaperPresets(context: Context, effectKeys: Array<String>) {
         .setNegativeButton("Anulează", null)
         .show()
 }
+
+

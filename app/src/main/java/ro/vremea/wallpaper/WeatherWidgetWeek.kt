@@ -70,6 +70,13 @@ class WeatherWidgetWeek : AppWidgetProvider() {
             wText(c, p, nm, m, hf * 0.17f, hf * 0.095f, wf * 0.55f)
             p.textAlign = Paint.Align.RIGHT
             wText(c, p, "${d.t.roundToInt()}°", wf - m, hf * 0.18f, hf * 0.12f, wf * 0.3f)
+            p.textAlign = Paint.Align.CENTER
+            val info = when {
+                d.stale -> "⚠ Date vechi · ${d.ageMinutes} min"
+                d.nextChange.isNotBlank() -> "☔ ${d.rainProbability}% · ${d.nextChange}"
+                else -> "Ploaie azi ${d.rainProbability}%"
+            }
+            wText(c, p, info, wf / 2f, hf * 0.28f, hf * 0.06f, wf * 0.92f, 225)
 
             p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             p.textAlign = Paint.Align.CENTER
@@ -85,3 +92,4 @@ class WeatherWidgetWeek : AppWidgetProvider() {
         }
     }
 }
+

@@ -33,39 +33,116 @@ internal fun wCat(code: Int): Int = when {
 
 internal class CurData(
     val name: String, val t: Double, val code: Int, val day: Boolean, val f: Boolean,
-    val dates: List<String>, val dCode: IntArray, val dMax: DoubleArray, val dMin: DoubleArray
+    val dates: List<String>, val dCode: IntArray, val dMax: DoubleArray, val dMin: DoubleArray,
+    val feels: Double = t, val rainProbability: Int = 0, val nextChange: String = "",
+    val updatedAt: Long = 0L, val ageMinutes: Long = 0L, val stale: Boolean = false
 )
 
+/** Citește ultima prognoză aleasă de aplicație, inclusiv atunci când telefonul e offline. */
+internal fun fetchAppWeatherCache(ctx: Context): CurData? {
+    return try {
+        val cache = ctx.getSharedPreferences("cache", Context.MODE_PRIVATE)
+        val raw = cache.getString("last", null) ?: return null
+        val at = cache.getLong("at", 0L)
+        val age = if (at > 0L) ((System.currentTimeMillis() - at) / 60000L).coerceAtLeast(0L) else Long.MAX_VALUE
+        parseWidgetWeather(ctx, JSONObject(raw), at, age)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun parseWidgetWeather(ctx: Context, json: JSONObject, updatedAt: Long, ageMinutes: Long): CurData? {
+    return try {
+        val ap = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
+        val current = json.optJSONObject("current") ?: return null
+        val daily = json.optJSONObject("daily") ?: return null
+        val t = current.optDouble("temperature_2m", Double.NaN)
+        if (t.isNaN()) return null
+        val unit = json.optJSONObject("current_units")?.optString("temperature_2m", "") ?: ""
+        val f = if (unit.isNotBlank()) unit.contains("F", ignoreCase = true) else ap.getString("units", "c") == "f"
+        val datesJson = daily.optJSONArray("time")
+        val codesJson = daily.optJSONArray("weather_code")
+        val maxJson = daily.optJSONArray("temperature_2m_max")
+        val minJson = daily.optJSONArray("temperature_2m_min")
+        val count = minOf(5, datesJson?.length() ?: 0)
+        val dates = ArrayList<String>(count)
+        val codes = IntArray(count)
+        val highs = DoubleArray(count)
+        val lows = DoubleArray(count)
+        for (i in 0 until count) {
+            dates.add(datesJson!!.optString(i, ""))
+            codes[i] = codesJson?.optInt(i, current.optInt("weather_code", 0)) ?: current.optInt("weather_code", 0)
+            highs[i] = maxJson?.optDouble(i, t) ?: t
+            lows[i] = minJson?.optDouble(i, t) ?: t
+        }
+        val code = current.optInt("weather_code", 0)
+        val change = nextChange(current, json.optJSONObject("hourly"))
+        val dailyRain = daily.optJSONArray("precipitation_probability_max")?.optInt(0, 0) ?: 0
+        val probability = if (change.second > 0) change.second else dailyRain
+        CurData(
+            ap.getString("name", null) ?: "București", t, code, current.optInt("is_day", 1) == 1, f,
+            dates, codes, highs, lows, current.optDouble("apparent_temperature", t), probability,
+            change.first, updatedAt, ageMinutes, ageMinutes >= 60L
+        )
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun nextChange(current: JSONObject, hourly: JSONObject?): Pair<String, Int> {
+    val times = hourly?.optJSONArray("time") ?: return "" to 0
+    val codes = hourly.optJSONArray("weather_code") ?: return "" to 0
+    val probabilities = hourly.optJSONArray("precipitation_probability")
+    val now = current.optString("time", "").take(13)
+    val currentCode = current.optInt("weather_code", 0)
+    var examined = 0
+    for (i in 0 until minOf(times.length(), codes.length())) {
+        val time = times.optString(i, "")
+        if (time <= now) continue
+        val code = codes.optInt(i, currentCode)
+        val probability = probabilities?.optInt(i, 0)?.coerceIn(0, 100) ?: 0
+        val hour = time.substringAfter('T', "").take(5)
+        if (probability >= 50 && currentCode !in 51..67 && currentCode !in 80..82 && currentCode < 95) {
+            return "Ploaie posibilă ~$hour" to probability
+        }
+        if (wCat(code) != wCat(currentCode)) {
+            val label = when (code) {
+                0 -> "Senin"
+                1, 2 -> "Parțial noros"
+                3 -> "Noros"
+                in 45..48 -> "Ceață"
+                in 51..67, in 80..82 -> "Ploaie"
+                in 71..77, in 85..86 -> "Ninsoare"
+                else -> "Furtună"
+            }
+            return "$label ~$hour" to probability
+        }
+        examined++
+        if (examined >= 10) break
+    }
+    return "" to 0
+}
+
 internal fun fetchCurRaw(ctx: Context): CurData? {
-    try {
+    return try {
         val ap = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         val f = ap.getString("units", "c") == "f"
         val name = ap.getString("name", null) ?: "București"
         val lat = ap.getString("lat", null) ?: "44.4268"
         val lon = ap.getString("lon", null) ?: "26.1025"
-        val u = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-            "&current=temperature_2m,weather_code,is_day" +
-            "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto" +
+        val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+            "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
+            "&hourly=weather_code,precipitation_probability" +
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=5&timezone=auto" +
             (if (f) "&temperature_unit=fahrenheit" else "")
-        val conn = URL(u).openConnection()
-        conn.connectTimeout = 10000
-        conn.readTimeout = 10000
-        val j = JSONObject(conn.getInputStream().bufferedReader().readText())
-        val cur = j.getJSONObject("current")
-        val d = j.getJSONObject("daily")
-        val tm = d.getJSONArray("time")
-        val wc = d.getJSONArray("weather_code")
-        val mx = d.getJSONArray("temperature_2m_max")
-        val mn = d.getJSONArray("temperature_2m_min")
-        val n = tm.length()
-        val dates = ArrayList<String>()
-        for (i in 0 until n) dates.add(tm.getString(i))
-        return CurData(
-            name, cur.getDouble("temperature_2m"), cur.getInt("weather_code"), cur.getInt("is_day") == 1, f, dates,
-            IntArray(n) { wc.getInt(it) }, DoubleArray(n) { mx.getDouble(it) }, DoubleArray(n) { mn.getDouble(it) }
-        )
-    } catch (e: Exception) {
-        return null
+        val conn = URL(url).openConnection().apply { connectTimeout = 8000; readTimeout = 8000 }
+        val json = JSONObject(conn.getInputStream().bufferedReader().readText())
+        parseWidgetWeather(ctx, json, System.currentTimeMillis(), 0L)?.let { data ->
+            CurData(name, data.t, data.code, data.day, f, data.dates, data.dCode, data.dMax, data.dMin,
+                data.feels, data.rainProbability, data.nextChange, data.updatedAt, 0L, false)
+        }
+    } catch (_: Exception) {
+        null
     }
 }
 

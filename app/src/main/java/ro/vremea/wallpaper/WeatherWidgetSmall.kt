@@ -59,8 +59,15 @@ class WeatherWidgetSmall : AppWidgetProvider() {
             wText(c, p, "${d.t.roundToInt()}°", wf / 2f, hf * 0.80f, base * 0.26f, wf * 0.9f)
             p.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             val nm = if (d.name.length > 18) d.name.take(17) + "…" else d.name
-            wText(c, p, nm, wf / 2f, hf * 0.94f, base * 0.095f, wf * 0.9f, 230)
+            val info = when {
+                d.stale -> "⚠ ${d.ageMinutes} min · $nm"
+                d.rainProbability > 0 -> "$nm · ☔ ${d.rainProbability}%"
+                else -> nm
+            }
+            wText(c, p, info, wf / 2f, hf * 0.94f, base * 0.088f, wf * 0.9f, 230)
             return bmp
         }
     }
 }
+
+

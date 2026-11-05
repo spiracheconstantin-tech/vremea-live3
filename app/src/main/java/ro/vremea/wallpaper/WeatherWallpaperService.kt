@@ -1,6 +1,9 @@
 package ro.vremea.wallpaper
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import java.util.Calendar
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.location.Location
@@ -134,6 +137,13 @@ class WeatherWallpaperService : WallpaperService() {
         private val planets = PlanetFx()
         private val stormGlow = StormGlowFx()
         private val weatherTransition = WeatherTransitionFx()
+        private val seasonalFx = SeasonalFx()
+        private var fxLeaves = true
+        private var fxFrost = true
+        private var fxBlossoms = true
+        private var fxPollen = true
+        private var fxFireflies = true
+        private var fxDew = true
         private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion" || key == "wp_stars" || key == "wp_quality") {
                 handler.removeCallbacks(reloadFxSettings)
@@ -256,11 +266,13 @@ class WeatherWallpaperService : WallpaperService() {
             val pmgr = getSystemService(POWER_SERVICE) as android.os.PowerManager
             val bi = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
             val lvl = if (bi != null) bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) * 100 / max(1, bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)) else 100
+            val autoEco = pmgr.isPowerSaveMode || lvl < 15
             if (pmgr.isPowerSaveMode || lvl < 20) {
                 frameMs = max(frameMs, 33L)
                 qMul = min(qMul, 0.7f)
             }
-            reduceMotion = ap0.getBoolean("wp_reduce_motion", false)
+            if (autoEco) { frameMs = max(frameMs, 66L); qMul = min(qMul, 0.5f) }
+            reduceMotion = ap0.getBoolean("wp_reduce_motion", false) || autoEco
             if (reduceMotion) {
                 frameMs = max(frameMs, 66L)
                 qMul = min(qMul, 0.55f)
@@ -277,6 +289,12 @@ class WeatherWallpaperService : WallpaperService() {
             fxWeatherTransition = ap0.getBoolean("wp_fx_transition", true)
             fxBirds = ap0.getBoolean("wp_fx_birds", true)
             fxLightning = ap0.getBoolean("wp_fx_lightning", true)
+            fxLeaves = ap0.getBoolean("wp_fx_leaves", true)
+            fxFrost = ap0.getBoolean("wp_fx_frost", true)
+            fxBlossoms = ap0.getBoolean("wp_fx_blossoms", true)
+            fxPollen = ap0.getBoolean("wp_fx_pollen", true)
+            fxFireflies = ap0.getBoolean("wp_fx_fireflies", true)
+            fxDew = ap0.getBoolean("wp_fx_dew", true)
             if (k != 6 || !fxLightning) {
                 nextBolt = 0L
                 boltUntil = 0L
@@ -627,9 +645,17 @@ class WeatherWallpaperService : WallpaperService() {
             }
         }
 
+        private val energyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                handler.removeCallbacks(reloadFxSettings)
+                handler.postDelayed(reloadFxSettings, 250L)
+            }
+        }
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             getSharedPreferences("app", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(fxPrefsListener)
+            val energyFilter = IntentFilter().apply { addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED); addAction(android.content.Intent.ACTION_BATTERY_LOW); addAction(android.content.Intent.ACTION_BATTERY_OKAY) }
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(energyReceiver, energyFilter, android.content.Context.RECEIVER_NOT_EXPORTED) else registerReceiver(energyReceiver, energyFilter)
         }
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
@@ -672,6 +698,7 @@ class WeatherWallpaperService : WallpaperService() {
         }
         override fun onDestroy() {
             getSharedPreferences("app", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(fxPrefsListener)
+            try { unregisterReceiver(energyReceiver) } catch (_: Exception) { }
             handler.removeCallbacksAndMessages(null)
             super.onDestroy()
         }
@@ -1365,6 +1392,9 @@ class WeatherWallpaperService : WallpaperService() {
                         ground.draw(c, w, h, t, dtf, code, tC)
             meteors.draw(c, w, h, t, dtf, !day, k <= 1)
             fx.draw(c, w, h, t, dtf, k, day, tC, hx, wspd, now, sunrise, sunset, tiltX, tiltY)
+            val localCalendar = Calendar.getInstance()
+            seasonalFx.draw(c, w, h, t, dtf, localCalendar.get(Calendar.MONTH), now, tC, code, day, hx,
+                reduceMotion, qMul, fxLeaves, fxFrost, fxBlossoms, fxPollen, fxFireflies, fxDew)
             val vk = w.toLong() * 10000L + h.toLong()
             if (vigShader == null || vigKey != vk) {
                 vigShader = RadialGradient(
@@ -1380,6 +1410,9 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
+
+
 
 
 
