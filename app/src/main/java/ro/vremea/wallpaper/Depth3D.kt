@@ -200,6 +200,8 @@ class Hills3D {
     private fun build(bw: Int, bh: Int, k: Int, bot: Int, day: Boolean) {
         val ground = when {
             k == 5 -> Color.rgb(236, 241, 249)
+            k == 4 || k == 6 -> if (day) Color.rgb(38, 67, 67) else Color.rgb(12, 25, 34)
+            k == 3 -> if (day) Color.rgb(91, 111, 102) else Color.rgb(25, 34, 43)
             day -> Color.rgb(52, 98, 72)
             else -> Color.rgb(14, 24, 32)
         }
@@ -244,7 +246,7 @@ class Hills3D {
             if (l < 2) {
                 q.shader = LinearGradient(
                     0f, baseY, 0f, bhf,
-                    Color.argb(80, Color.red(bot), Color.green(bot), Color.blue(bot)),
+                    Color.argb(if (k == 3) 130 else if (k == 4 || k == 6) 100 else 80, Color.red(bot), Color.green(bot), Color.blue(bot)),
                     Color.argb(0, Color.red(bot), Color.green(bot), Color.blue(bot)),
                     Shader.TileMode.CLAMP
                 )
@@ -255,6 +257,7 @@ class Hills3D {
         }
     }
 }
+
 
 
 

@@ -3,6 +3,7 @@ package ro.vremea.wallpaper
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.appwidget.AppWidgetManager
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Context
@@ -241,6 +242,22 @@ class MainActivity : Activity() {
         m.show()
     }
 
+    private fun refreshExistingWeatherWidgets() {
+        val manager = AppWidgetManager.getInstance(this)
+        val providers = listOf("WeatherWidget", "WeatherWidgetSmall", "WeatherWidgetWeek", "WeatherWidgetClock")
+        for (provider in providers) {
+            try {
+                val component = ComponentName(packageName, "$packageName.$provider")
+                val ids = manager.getAppWidgetIds(component)
+                if (ids.isNotEmpty()) {
+                    val update = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
+                        .setComponent(component)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    sendBroadcast(update)
+                }
+            } catch (_: Exception) { }
+        }
+    }
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 
     private fun openChooser() {
@@ -536,9 +553,11 @@ class MainActivity : Activity() {
                 }
                 j.put("src", label)
                 getSharedPreferences("cache", MODE_PRIVATE).edit().putString("last", j.toString()).putLong("at", System.currentTimeMillis()).apply()
+                refreshExistingWeatherWidgets()
                 runOnUiThread { render(j, f) }
             } catch (e: Exception) {
                                val cs = getSharedPreferences("cache", MODE_PRIVATE).getString("last", null)
+                refreshExistingWeatherWidgets()
                 if (cs != null) {
                     val age = (System.currentTimeMillis() - getSharedPreferences("cache", MODE_PRIVATE).getLong("at", 0L)) / 60000L
                     runOnUiThread {
@@ -703,7 +722,11 @@ class MainActivity : Activity() {
         addConfidence(this, body, f)
                 addMonth(this, body, f)
         val sourceLabel = j.optString("src", "Open-Meteo")
-        val footerLabel = if (sourceLabel.startsWith("Date salvate")) "Date: $sourceLabel" else {
+        val footerLabel = if (sourceLabel.startsWith("Date salvate")) {
+            val cacheAt = getSharedPreferences("cache", Context.MODE_PRIVATE).getLong("at", 0L)
+            val ageMin = if (cacheAt > 0L) ((System.currentTimeMillis() - cacheAt) / 60000L).coerceAtLeast(0L) else 0L
+            if (ageMin >= 60L) "Date: ⚠ Date vechi · salvate acum ${ageMin / 60} h ${ageMin % 60} min" else "Date: $sourceLabel"
+        } else {
             val cacheAt = getSharedPreferences("cache", Context.MODE_PRIVATE).getLong("at", 0L)
             val freshness = if (cacheAt > 0L) "Actualizat la " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date(cacheAt)) else "Actualizare necunoscută"
             "Date: $sourceLabel · $freshness"
@@ -711,6 +734,7 @@ class MainActivity : Activity() {
         add(tv(footerLabel, 11f, alpha = .72f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
+
 
 
 

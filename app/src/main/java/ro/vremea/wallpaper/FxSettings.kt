@@ -2,6 +2,7 @@ package ro.vremea.wallpaper
 
 import android.app.AlertDialog
 import android.content.Context
+import android.widget.Toast
 
 internal fun wallpaperFxSettings(context: Context) {
     val prefs = context.getSharedPreferences("app", Context.MODE_PRIVATE)
@@ -21,6 +22,35 @@ internal fun wallpaperFxSettings(context: Context) {
         .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
             prefs.edit().putBoolean(keys[which], isChecked).apply()
         }
+        .setNeutralButton("Preset aspect") { _, _ -> showWallpaperPresets(context, keys) }
         .setPositiveButton("Gata", null)
+        .show()
+}
+
+private fun showWallpaperPresets(context: Context, effectKeys: Array<String>) {
+    val names = arrayOf("Natural", "Mai animat", "Economie de baterie")
+    AlertDialog.Builder(context)
+        .setTitle("Alege stilul wallpaper")
+        .setItems(names) { _, which ->
+            val prefs = context.getSharedPreferences("app", Context.MODE_PRIVATE)
+            val edit = prefs.edit()
+            when (which) {
+                0 -> {
+                    edit.putString("wp_quality", "normal").putBoolean("wp_reduce_motion", false)
+                    effectKeys.forEach { edit.putBoolean(it, true) }
+                }
+                1 -> {
+                    edit.putString("wp_quality", "max").putBoolean("wp_reduce_motion", false)
+                    effectKeys.forEach { edit.putBoolean(it, true) }
+                }
+                else -> {
+                    edit.putString("wp_quality", "eco").putBoolean("wp_reduce_motion", true)
+                    effectKeys.forEach { edit.putBoolean(it, it == "wp_fx_grass" || it == "wp_stars" || it == "wp_fx_lightning") }
+                }
+            }
+            edit.apply()
+            Toast.makeText(context, "Stil aplicat: ${names[which]}", Toast.LENGTH_SHORT).show()
+        }
+        .setNegativeButton("Anulează", null)
         .show()
 }

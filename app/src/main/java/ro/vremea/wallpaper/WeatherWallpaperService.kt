@@ -135,7 +135,7 @@ class WeatherWallpaperService : WallpaperService() {
         private val stormGlow = StormGlowFx()
         private val weatherTransition = WeatherTransitionFx()
         private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion" || key == "wp_stars") {
+            if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion" || key == "wp_stars" || key == "wp_quality") {
                 handler.removeCallbacks(reloadFxSettings)
                 handler.postDelayed(reloadFxSettings, 180L)
             } else if (key == "test" || key == "test_min") {
@@ -843,7 +843,7 @@ class WeatherWallpaperService : WallpaperService() {
                 if (l < 2) {
                     p.shader = LinearGradient(
                         0f, baseY, 0f, bhf,
-                        Color.argb(70, Color.red(bot), Color.green(bot), Color.blue(bot)),
+                        Color.argb(if (k == 3) 112 else if (k == 4 || k == 6) 88 else 70, Color.red(bot), Color.green(bot), Color.blue(bot)),
                         Color.argb(0, Color.red(bot), Color.green(bot), Color.blue(bot)),
                         Shader.TileMode.CLAMP
                     )
@@ -1069,7 +1069,8 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawRect(-w * 0.3f, h * 0.12f, w * 1.3f, h * 0.30f, paint)
                     useShader(null)
                     c.restore()
-                        for (i in 0 until (if (showStars) 105 else 0)) {
+                        val visibleStarCount = if (showStars) (105f * (1f - cloud.coerceIn(0, 100) / 100f)).roundToInt() else 0
+                        for (i in 0 until visibleStarCount) {
                         val x = ((i * 7919) % 1000) / 1000f * w
                         val y = ((i * 104729) % 1000) / 1000f * h * 0.62f
                         val big = i % 31 == 0
@@ -1379,6 +1380,7 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
 
 
 
