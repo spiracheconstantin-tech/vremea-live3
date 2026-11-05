@@ -242,6 +242,11 @@ class WeatherWallpaperService : WallpaperService() {
         private fun init() {
             val k = cat()
             val heavy = code == 75 || code == 86
+            if (k != 6) {
+                nextBolt = 0L
+                boltUntil = 0L
+                flash = 0f
+            }
                         val ap0 = getSharedPreferences("app", MODE_PRIVATE)
             val ql = ap0.getString("wp_quality", "normal")
             qMul = if (ql == "eco") 0.5f else if (ql == "max") 1.3f else 1f
@@ -249,9 +254,15 @@ class WeatherWallpaperService : WallpaperService() {
             val pmgr = getSystemService(POWER_SERVICE) as android.os.PowerManager
             val bi = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
             val lvl = if (bi != null) bi.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) * 100 / max(1, bi.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)) else 100
-            if (pmgr.isPowerSaveMode || lvl < 20) frameMs = 33L
+            if (pmgr.isPowerSaveMode || lvl < 20) {
+                frameMs = max(frameMs, 33L)
+                qMul = min(qMul, 0.7f)
+            }
             reduceMotion = ap0.getBoolean("wp_reduce_motion", false)
-            if (reduceMotion) frameMs = max(frameMs, 66L)
+            if (reduceMotion) {
+                frameMs = max(frameMs, 66L)
+                qMul = min(qMul, 0.55f)
+            }
             showStars = ap0.getBoolean("wp_stars", true)
             showHillsV = ap0.getBoolean("wp_hills", true)
             fxAurora = ap0.getBoolean("wp_fx_aurora", true)
@@ -266,7 +277,7 @@ class WeatherWallpaperService : WallpaperService() {
                         flatStyle = ap0.getBoolean("wp_flat", false)
             val n = when (k) {
                 4, 6 -> rainN()
-                5 -> when (code) { 71, 85 -> 70; 73 -> 130; 75, 86 -> 260; else -> 90 }
+                5 -> when (code) { 71, 85 -> 55; 73 -> 105; 75, 86 -> 190; else -> 75 }
                 else -> 0
             }
             parts = ArrayList()
@@ -274,7 +285,7 @@ class WeatherWallpaperService : WallpaperService() {
                 val d = rnd.nextFloat()
                 parts.add(
                     if (k == 5) P(rnd.nextFloat() * w, rnd.nextFloat() * h, (1.5f + 3.5f * d) * (if (heavy) 1.5f else 1f), d)
-                    else P(rnd.nextFloat() * w, rnd.nextFloat() * h, 22f + rnd.nextFloat() * 14f, d)
+                    else P(rnd.nextFloat() * w, rnd.nextFloat() * h, 18f + rnd.nextFloat() * 12f + intensity().coerceIn(0f, 10f) * 1.7f, d)
                 )
             }
             hail = ArrayList()
@@ -290,21 +301,21 @@ class WeatherWallpaperService : WallpaperService() {
             }
             val nc = when (k) {
                 0 -> 0
-                1 -> max(1, (cloud / 100f * 4f).roundToInt())
-                2 -> max(3, (cloud / 100f * 5f).roundToInt())
-                6 -> 5
-                3 -> 2
-                else -> 4
+                1 -> max(1, (cloud / 100f * 5f).roundToInt())
+                2 -> max(4, (cloud / 100f * 6f).roundToInt())
+                6 -> 6
+                3 -> 3
+                else -> 3
             }
             clouds = ArrayList()
             repeat(nc) {
                 val dpt = rnd.nextFloat()
                 val sz = 0.7f + 0.9f * dpt
-                clouds.add(P(rnd.nextFloat() * w, h * (0.06f + 0.30f * (1f - dpt)), 0.25f + 0.45f * dpt, sz))
+                clouds.add(P(rnd.nextFloat() * w, h * (0.06f + 0.30f * (1f - dpt)), 0.18f + 0.52f * dpt, sz))
             }
             wisps = ArrayList()
             if (k == 3) {
-                repeat(7) { wisps.add(P(rnd.nextFloat() * w, h * (0.22f + 0.65f * rnd.nextFloat()), 0.15f + 0.4f * rnd.nextFloat(), rnd.nextFloat())) }
+                repeat(9) { wisps.add(P(rnd.nextFloat() * w, h * (0.30f + 0.58f * rnd.nextFloat()), 0.12f + 0.32f * rnd.nextFloat(), rnd.nextFloat())) }
             }
         }
 
@@ -1125,8 +1136,8 @@ class WeatherWallpaperService : WallpaperService() {
             for (cl in clouds) {
                 val tt = ((cl.s - 0.7f) / 0.9f).coerceIn(0f, 1f)
                 val bw = 170f * cl.s * us
-                val bh = bw * 240f / 440f
-                cl.x += cl.v * (0.8f + wspd * 3f) * hx * dtf
+                val bh = bw * 240f / 440f * (0.88f + cl.v * 0.36f)
+                cl.x += cl.v * (0.45f + wspd * 2.4f) * hx * dtf
                 if (cl.x > w) cl.x = -bw
                 if (cl.x < -bw) cl.x = w
                 paint.alpha = (Color.alpha(cloudCol) * (0.40f + 0.60f * tt)).toInt().coerceIn(0, 255)
@@ -1155,15 +1166,15 @@ class WeatherWallpaperService : WallpaperService() {
 
             // ceata: val usor si fasii subtiri, scurte
             if (k == 3) {
-                c.drawColor(Color.argb(45, 235, 240, 245))
+                c.drawColor(Color.argb(22, 235, 240, 245))
                 val wb = wispBitmap()
                 for (p in wisps) {
-                    val bw = w * (0.22f + 0.28f * p.s)
+                    val bw = w * (0.30f + 0.40f * p.s)
                     val bh = bw * 60f / 400f
-                    p.x += p.v * (0.8f + wspd * 2.5f) * hx * us * dtf
+                    p.x += p.v * (0.45f + wspd * 1.6f) * hx * us * dtf
                     if (p.x > w) p.x = -bw
                     if (p.x < -bw) p.x = w
-                    paint.alpha = (35 + 45 * p.s).toInt()
+                    paint.alpha = (22 + 48 * p.s).toInt()
                     rect.set(p.x, p.y, p.x + bw, p.y + bh)
                     c.drawBitmap(wb, null, rect, paint)
                 }
@@ -1270,21 +1281,17 @@ class WeatherWallpaperService : WallpaperService() {
             // ninsoare
             if (k == 5) {
                 if (heavySnow) c.drawColor(Color.argb(55, 255, 255, 255))
-                val fb = flakeBitmap()
                 for (p in parts) {
                     val d = p.s
-                    p.y += p.v * sc * 1.6f * dtf
-                    p.x += (sin(t * (0.7f + d * 0.5f) + p.v * 9f) * 0.9f * (0.5f + d) + slant * sc * 0.3f * (0.5f + d)) * dtf
+                    p.y += p.v * sc * 1.05f * dtf
+                    p.x += (sin(t * (0.45f + d * 0.35f) + p.v * 9f) * 0.7f * (0.5f + d) + slant * sc * 0.24f * (0.5f + d)) * dtf
                     if (p.y > h) { p.y = -30f; p.x = rnd.nextFloat() * w }
                     if (p.x > w) p.x -= w
                     if (p.x < 0f) p.x += w
-                    val size = (6f + 20f * d) * sc * 1.8f
-                    paint.alpha = (100 + 130 * d).toInt()
-                    rect.set(p.x - size / 2f, p.y - size / 2f, p.x + size / 2f, p.y + size / 2f)
-                    c.save()
-                    c.rotate((t * 12f + d * 360f) % 360f, p.x, p.y)
-                    c.drawBitmap(fb, null, rect, paint)
-                    c.restore()
+                    val size = (1.4f + 4.8f * d) * sc * (if (heavySnow) 1.2f else 1f)
+                    paint.color = Color.WHITE
+                    paint.alpha = (55 + 95 * d).toInt()
+                    c.drawCircle(p.x, p.y, max(0.8f, size / 2f), paint)
                 }
                 paint.alpha = 255
                 useShader(
@@ -1300,8 +1307,10 @@ class WeatherWallpaperService : WallpaperService() {
             // fulgere cu ramura
             if (k == 6) {
                 val nowMs = SystemClock.uptimeMillis()
-                if (nowMs > nextBolt) {
-                    nextBolt = nowMs + 2500 + rnd.nextInt(6000)
+                if (nextBolt == 0L) {
+                    nextBolt = nowMs + 1800L + rnd.nextInt(6500)
+                } else if (nowMs > nextBolt) {
+                    nextBolt = nowMs + 5000L + rnd.nextInt(13000)
                     flash = 1f
                     boltUntil = nowMs + 230
                     makeBolt()
@@ -1325,7 +1334,7 @@ class WeatherWallpaperService : WallpaperService() {
                     }
                 }
                 if (flash > 0.02f) {
-                    c.drawColor(Color.argb((flash * 140).toInt(), 255, 255, 255))
+                    c.drawColor(Color.argb((flash * 92).toInt(), 226, 236, 255))
                     if (fxStormGlow) stormGlow.draw(c, w, h, flash, cloud)
                     flash *= 0.82f.pow(dtf)
                 }

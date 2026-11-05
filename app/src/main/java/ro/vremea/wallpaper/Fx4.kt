@@ -7,6 +7,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.sin
 
 /** Reflected sky highlights and small ripples in the foreground lake. */
@@ -88,22 +89,29 @@ internal class StormGlowFx {
 internal class WeatherTransitionFx {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private var previous = -1
+    private var previousDay: Boolean? = null
     private var alpha = 0f
     private var tint = Color.TRANSPARENT
 
     fun draw(c: Canvas, w: Float, h: Float, category: Int, dtf: Float, day: Boolean) {
-        if (category != previous) {
+        if (category != previous || previousDay != day) {
             if (previous >= 0) {
-                alpha = 0.16f
-                tint = if (day) Color.WHITE else 0xFF9BB9EA.toInt()
+                alpha = 0.17f
+                tint = when {
+                    !day -> 0xFF91A9D4.toInt()
+                    category == 5 -> 0xFFEAF2FF.toInt()
+                    category == 3 || category == 4 || category == 6 -> 0xFFB8C3CF.toInt()
+                    else -> 0xFFFFE4B5.toInt()
+                }
             }
             previous = category
+            previousDay = day
         }
         if (alpha <= 0.002f) return
         p.color = tint
         p.alpha = (alpha * 255f).toInt().coerceIn(0, 255)
         c.drawRect(0f, 0f, w, h, p)
-        alpha *= 0.94f.coerceAtLeast(1f - 0.06f * dtf)
+        alpha *= 0.99f.pow(dtf.coerceIn(0.1f, 2f))
         p.alpha = 255
     }
 }
