@@ -1098,13 +1098,13 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawCircle(sx, sy, hrad, paint)
                     useShader(null)
 
-                    // Folosește exact pictograma solară din aplicație, păstrând halo-ul animat al wallpaperului.
-                    val sunIcon = appSunBitmap()
+                    // Raze animate în jurul discului fix; bazele lor se suprapun puțin peste disc.
                     val sunSize = r * (256f / 46f)
-                    paint.alpha = (255f * coldSun).toInt()
-                    rect.set(sx - sunSize / 2f, sy - sunSize / 2f, sx + sunSize / 2f, sy + sunSize / 2f)
-                    c.drawBitmap(sunIcon, null, rect, paint)
-                    paint.alpha = 255
+                    c.save()
+                    c.translate(sx - sunSize / 2f, sy - sunSize / 2f)
+                    c.scale(sunSize / 256f, sunSize / 256f)
+                    drawAppSun(c, 128f, 128f, 46f, t * 5f, (255f * coldSun).toInt())
+                    c.restore()
                     // Reflexii luminoase sub soare care se mișcă ușor în timpul zilei și la apus.
                     if (k == 0) {
                         for (i in 0..3) {
@@ -1157,7 +1157,9 @@ class WeatherWallpaperService : WallpaperService() {
                         sp.color = Color.argb(((1f - cyc) * 230).toInt(), 255, 255, 255)
                         c.drawLine(stx, sty, stx + w * 0.07f, sty - h * 0.018f, sp)
                     }
-                    val mb = appMoonBitmap()
+                    // Faza reală a lunii este calculată din data curentă și păstrată în desen.
+                    val phase = moonPhase()
+                    val mb = moonBitmap(phase)
                     val mr = w * 0.075f
                     val testScenario = TestMode.read(this@WeatherWallpaperService)
                     val moonTime = if (testScenario != null) {
@@ -1178,7 +1180,7 @@ class WeatherWallpaperService : WallpaperService() {
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
                     val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
-                    val illum = 0.58f
+                    val illum = ((1f - cos(2.0 * PI * phase).toFloat()) * 0.5f).coerceIn(0.04f, 1f)
                     if (moonAltitude > -3.0 || forceMoonForTest) {
                         useShader(
                             RadialGradient(
