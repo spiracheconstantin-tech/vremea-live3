@@ -23,6 +23,11 @@ internal fun appSunBitmap(): Bitmap {
     return bitmap
 }
 
+/** Draw the app's sun glyph with independently rotating rays and a fixed, connected disc. */
+internal fun drawAppSun(c: Canvas, cx: Float, cy: Float, r: Float, rayRotationDeg: Float, alpha: Int = 255) {
+    sun(c, cx, cy, r, rayRotationDeg, alpha)
+}
+
 @Synchronized
 internal fun appMoonBitmap(): Bitmap {
     appMoonCache?.let { return it }
@@ -69,12 +74,13 @@ fun iconView(ctx: Context, code: Int, day: Boolean, dp: Int): ImageView {
 private fun pt(): Paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
 // Soare: raze ascutite portocalii + disc galben in degrade
-private fun sun(c: Canvas, cx: Float, cy: Float, r: Float) {
+private fun sun(c: Canvas, cx: Float, cy: Float, r: Float, rayRotationDeg: Float = 0f, alpha: Int = 255) {
     val p = pt()
+    p.alpha = alpha.coerceIn(0, 255)
     val n = 14
     for (i in 0 until n) {
         c.save()
-        c.rotate(i * 360f / n, cx, cy)
+        c.rotate(i * 360f / n + rayRotationDeg, cx, cy)
         val ray = Path()
         ray.moveTo(cx - r * 0.2f, cy - r * 0.95f)
         ray.lineTo(cx, cy - r * 1.62f)
