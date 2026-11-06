@@ -87,6 +87,10 @@ class WeatherWallpaperService : WallpaperService() {
         @Volatile private var utcOff = 0
         @Volatile private var sunrise = 360
         @Volatile private var sunset = 1080
+        @Volatile private var moonLatitude = 44.4268
+        @Volatile private var moonLongitude = 26.1025
+        private var moonPositionMinute = Long.MIN_VALUE
+        private var cachedMoonPosition = MoonSkyPosition.Point(0.0, 0.0)
         private var parts = ArrayList<P>()
         private var hail = ArrayList<P>()
         private var clouds = ArrayList<P>()
@@ -408,6 +412,9 @@ class WeatherWallpaperService : WallpaperService() {
         }
 
         private fun load(lat: Double, lon: Double) {
+            moonLatitude = lat
+            moonLongitude = lon
+            moonPositionMinute = Long.MIN_VALUE
         val tm = TestMode.read(this@WeatherWallpaperService)
             if (tm != null) {
                 code = tm.code
@@ -1062,12 +1069,12 @@ class WeatherWallpaperService : WallpaperService() {
                     useShader(null)
 
                     // Halo-ul difuz și razele scurte din jurul discului păstrează aspectul solar fără fascicule pe ecran.
-                    sp.strokeWidth = w * 0.0045f
-                    for (i in 0 until 14) {
-                        val a = t * 0.04f + i * (2f * PI.toFloat() / 14f)
-                        val len = if (i % 2 == 0) 1.52f else 1.34f
-                        sp.color = Color.argb(if (i % 2 == 0) 25 else 14, 255, 246, 220)
-                        c.drawLine(sx + cos(a) * r * 1.4f, sy + sin(a) * r * 1.4f, sx + cos(a) * r * len, sy + sin(a) * r * len, sp)
+                    sp.strokeWidth = w * 0.0042f
+                    for (i in 0 until 12) {
+                        val a = t * 0.025f + i * (2f * PI.toFloat() / 12f)
+                        val len = if (i % 2 == 0) 1.72f else 1.52f
+                        sp.color = Color.argb(if (i % 2 == 0) 32 else 20, 255, 247, 224)
+                        c.drawLine(sx + cos(a) * r * 1.38f, sy + sin(a) * r * 1.38f, sx + cos(a) * r * len, sy + sin(a) * r * len, sp)
                     }
                     useShader(
                         RadialGradient(
@@ -1127,21 +1134,41 @@ class WeatherWallpaperService : WallpaperService() {
                     val ph = moonPhase()
                     val mb = moonBitmap(ph)
                     val mr = w * 0.075f
+                    val testScenario = TestMode.read(this@WeatherWallpaperService)
+                    val moonTime = if (testScenario != null) {
+                        val local = Calendar.getInstance()
+                        val localMinute = local.get(Calendar.HOUR_OF_DAY) * 60 + local.get(Calendar.MINUTE)
+                        System.currentTimeMillis() + (testScenario.minute - localMinute) * 60000L
+                    } else System.currentTimeMillis()
+                    val minuteKey = moonTime / 60000L
+                    if (minuteKey != moonPositionMinute) {
+                        cachedMoonPosition = MoonSkyPosition.calculate(moonTime, moonLatitude, moonLongitude)
+                        moonPositionMinute = minuteKey
+                    }
+                    val moonPosition = cachedMoonPosition
+                    val moonAltitude = moonPosition.altitudeDeg
+                    val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
+                    val moonY = h * (0.56f - (moonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.40f)
+                    val moonHorizonAlpha = ((moonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
                     val illum = (1f - cos((2.0 * PI * ph.toDouble()).toFloat())) / 2f
-                    useShader(
-                        RadialGradient(
-                            sx, sy, mr * 4.5f,
-                            intArrayOf(Color.argb((70 * illum).toInt(), 220, 230, 255), 0),
-                            floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
+                    if (moonAltitude > -3.0) {
+                        useShader(
+                            RadialGradient(
+                                moonX, moonY, mr * 4.5f,
+                                intArrayOf(Color.argb((54 * illum * moonHorizonAlpha).toInt(), 220, 230, 255), 0),
+                                floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
+                            )
                         )
-                    )
-                    c.drawCircle(sx, sy, mr * 4.5f, paint)
-                    useShader(null)
-                    c.save()
-                    c.rotate(-18f, sx, sy)
-                    rect.set(sx - mr, sy - mr, sx + mr, sy + mr)
-                    c.drawBitmap(mb, null, rect, paint)
-                    c.restore()
+                        c.drawCircle(moonX, moonY, mr * 4.5f, paint)
+                        useShader(null)
+                        c.save()
+                        c.rotate(-18f, moonX, moonY)
+                        paint.alpha = (255 * moonHorizonAlpha).toInt()
+                        rect.set(moonX - mr, moonY - mr, moonX + mr, moonY + mr)
+                        c.drawBitmap(mb, null, rect, paint)
+                        paint.alpha = 255
+                        c.restore()
+                    }
                 }
             }
 
