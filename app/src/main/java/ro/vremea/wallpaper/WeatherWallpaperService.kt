@@ -1160,7 +1160,8 @@ class WeatherWallpaperService : WallpaperService() {
                     // Faza reală a lunii este calculată din data curentă și păstrată în desen.
                     val phase = moonPhase()
                     val mb = moonBitmap(phase)
-                    val mr = w * 0.075f
+                    // Disc lunar ~70% mai mic decât versiunea anterioară, scalat după lățimea ecranului.
+                    val mr = min(w, h) * 0.022f
                     val testScenario = TestMode.read(this@WeatherWallpaperService)
                     val moonTime = if (testScenario != null) {
                         val local = Calendar.getInstance()
@@ -1184,12 +1185,12 @@ class WeatherWallpaperService : WallpaperService() {
                     if (moonAltitude > -3.0 || forceMoonForTest) {
                         useShader(
                             RadialGradient(
-                                moonX, moonY, mr * 4.5f,
+                                moonX, moonY, mr * 3.0f,
                                 intArrayOf(Color.argb((54 * illum * moonHorizonAlpha).toInt(), 220, 230, 255), 0),
                                 floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
                             )
                         )
-                        c.drawCircle(moonX, moonY, mr * 4.5f, paint)
+                        c.drawCircle(moonX, moonY, mr * 3.0f, paint)
                         useShader(null)
                         paint.alpha = (255 * moonHorizonAlpha).toInt()
                         val moonSize = mr * (256f / 56f)
