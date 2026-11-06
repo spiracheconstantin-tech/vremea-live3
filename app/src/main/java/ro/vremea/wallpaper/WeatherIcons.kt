@@ -9,6 +9,43 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 private val icCache = HashMap<Int, Bitmap>()
+private var appSunCache: Bitmap? = null
+private var appMoonCache: Bitmap? = null
+private val appCloudCache = HashMap<Int, Bitmap>()
+
+/** Reusable, transparent versions of the exact weather glyphs shown in the app. */
+@Synchronized
+internal fun appSunBitmap(): Bitmap {
+    appSunCache?.let { return it }
+    val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
+    sun(Canvas(bitmap), 128f, 128f, 46f)
+    appSunCache = bitmap
+    return bitmap
+}
+
+@Synchronized
+internal fun appMoonBitmap(): Bitmap {
+    appMoonCache?.let { return it }
+    val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
+    moon(Canvas(bitmap), 128f, 128f, 56f)
+    appMoonCache = bitmap
+    return bitmap
+}
+
+@Synchronized
+internal fun appCloudBitmap(tone: Int): Bitmap {
+    val style = tone.coerceIn(0, 2)
+    appCloudCache[style]?.let { return it }
+    val bitmap = Bitmap.createBitmap(440, 240, Bitmap.Config.ARGB_8888)
+    cloud(Canvas(bitmap), 0f, 0f, 1.9f, style)
+    appCloudCache[style] = bitmap
+    return bitmap
+}
+
+internal fun drawAppWeatherStar(c: Canvas, x: Float, y: Float, size: Float, color: Int) {
+    val p = pt().apply { this.color = color }
+    star(c, x, y, size, p)
+}
 
 fun weatherBitmap(code: Int, day: Boolean): Bitmap {
     val key = code * 2 + (if (day) 1 else 0)
