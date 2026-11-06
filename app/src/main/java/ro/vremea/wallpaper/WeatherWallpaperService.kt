@@ -745,47 +745,13 @@ class WeatherWallpaperService : WallpaperService() {
             val key = col and 0x00FFFFFF
             val cached = cloudBmp
             if (cached != null && cloudKey == key) return cached
-
-            val bmp = Bitmap.createBitmap(440, 240, Bitmap.Config.ARGB_8888)
-            val cv = Canvas(bmp)
-            val silhouette = Path().apply {
-                moveTo(28f, 177f)
-                cubicTo(34f, 159f, 57f, 150f, 82f, 154f)
-                cubicTo(77f, 126f, 99f, 104f, 128f, 105f)
-                cubicTo(137f, 69f, 169f, 48f, 203f, 57f)
-                cubicTo(233f, 63f, 251f, 83f, 254f, 108f)
-                cubicTo(272f, 82f, 304f, 77f, 328f, 94f)
-                cubicTo(347f, 107f, 352f, 126f, 346f, 145f)
-                cubicTo(381f, 136f, 409f, 151f, 411f, 171f)
-                cubicTo(413f, 190f, 392f, 202f, 365f, 202f)
-                lineTo(70f, 202f)
-                cubicTo(44f, 202f, 27f, 193f, 28f, 177f)
-                close()
+            val tone = when {
+                Color.red(col) < 60 -> 2
+                Color.red(col) < 130 -> 1
+                !day -> 1
+                else -> 0
             }
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = shade(col, 0.68f)
-                maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
-            }
-            cv.save()
-            cv.translate(0f, 12f)
-            cv.drawPath(silhouette, shadowPaint)
-            cv.restore()
-
-            val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = LinearGradient(
-                    0f, 62f, 0f, 208f,
-                    intArrayOf(mixWhite(col, 0.28f), col, shade(col, 0.78f)),
-                    floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP
-                )
-            }
-            cv.drawPath(silhouette, body)
-
-            val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(46, 255, 255, 255)
-                maskFilter = BlurMaskFilter(18f, BlurMaskFilter.Blur.NORMAL)
-            }
-            cv.drawOval(RectF(108f, 73f, 267f, 132f), highlight)
-
+            val bmp = appCloudBitmap(tone)
             cloudBmp = bmp
             cloudKey = key
             return bmp
@@ -1132,27 +1098,13 @@ class WeatherWallpaperService : WallpaperService() {
                     c.drawCircle(sx, sy, hrad, paint)
                     useShader(null)
 
-                    // Halo-ul difuz și razele scurte din jurul discului păstrează aspectul solar fără fascicule pe ecran.
-                    sp.strokeWidth = w * 0.0042f
-                    for (i in 0 until 12) {
-                        val a = t * 0.025f + i * (2f * PI.toFloat() / 12f)
-                        val len = if (i % 2 == 0) 1.72f else 1.52f
-                        sp.color = Color.argb(((if (i % 2 == 0) 32 else 20) * coldSun).toInt(), 255, 247, 224)
-                        c.drawLine(sx + cos(a) * r * 1.38f, sy + sin(a) * r * 1.38f, sx + cos(a) * r * len, sy + sin(a) * r * len, sp)
-                    }
-                    useShader(
-                        RadialGradient(
-                            sx - r * .3f, sy - r * .3f, r * 1.35f,
-                            intArrayOf(
-                                0xFFFFFDF4.toInt(),
-                                blend(0xFFFFF0C4.toInt(), 0xFFFFB56E.toInt(), warm),
-                                blend(0xFFFFD985.toInt(), 0xFFE98754.toInt(), warm)
-                            ),
-                            floatArrayOf(0f, .68f, 1f), Shader.TileMode.CLAMP
-                        )
-                    )
-                    c.drawCircle(sx, sy, r, paint)
-                    useShader(null)
+                    // Folosește exact pictograma solară din aplicație, păstrând halo-ul animat al wallpaperului.
+                    val sunIcon = appSunBitmap()
+                    val sunSize = r * (256f / 46f)
+                    paint.alpha = (255f * coldSun).toInt()
+                    rect.set(sx - sunSize / 2f, sy - sunSize / 2f, sx + sunSize / 2f, sy + sunSize / 2f)
+                    c.drawBitmap(sunIcon, null, rect, paint)
+                    paint.alpha = 255
                     // Reflexii luminoase sub soare care se mișcă ușor în timpul zilei și la apus.
                     if (k == 0) {
                         for (i in 0..3) {
@@ -1190,15 +1142,8 @@ class WeatherWallpaperService : WallpaperService() {
                         val y = ((i * 104729) % 1000) / 1000f * h * 0.62f
                         val big = i % 31 == 0
                         val tw = 0.5f + 0.5f * sin(t * (0.25f + (i % 5) * 0.12f) + i)
-                        paint.color = Color.argb((45 + 105 * tw).toInt(), 232, 239, if (i % 7 == 0) 255 else 245)
-                        c.drawCircle(x, y, (0.45f + (i % 3) * 0.28f + (if (big) 0.35f else 0f)) * (0.9f + 0.15f * tw), paint)
-                        if (big) {
-                            sp.color = Color.argb((24 * tw).toInt(), 225, 235, 255)
-                            sp.strokeWidth = 1f
-                            val l = 3f + 2f * tw
-                            c.drawLine(x - l, y, x + l, y, sp)
-                            c.drawLine(x, y - l, x, y + l, sp)
-                        }
+                        val starSize = (0.75f + (i % 3) * 0.32f + (if (big) 0.55f else 0f)) * (0.9f + 0.15f * tw)
+                        drawAppWeatherStar(c, x, y, starSize, Color.argb((45 + 105 * tw).toInt(), 232, 239, if (i % 7 == 0) 255 else 245))
                     }
                     // stea cazatoare la ~40 de secunde
                     val cyc = t % 40f
@@ -1212,8 +1157,7 @@ class WeatherWallpaperService : WallpaperService() {
                         sp.color = Color.argb(((1f - cyc) * 230).toInt(), 255, 255, 255)
                         c.drawLine(stx, sty, stx + w * 0.07f, sty - h * 0.018f, sp)
                     }
-                    val ph = moonPhase()
-                    val mb = moonBitmap(ph)
+                    val mb = appMoonBitmap()
                     val mr = w * 0.075f
                     val testScenario = TestMode.read(this@WeatherWallpaperService)
                     val moonTime = if (testScenario != null) {
@@ -1234,7 +1178,7 @@ class WeatherWallpaperService : WallpaperService() {
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
                     val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
-                    val illum = (1f - cos((2.0 * PI * ph.toDouble()).toFloat())) / 2f
+                    val illum = 0.58f
                     if (moonAltitude > -3.0 || forceMoonForTest) {
                         useShader(
                             RadialGradient(
@@ -1245,13 +1189,11 @@ class WeatherWallpaperService : WallpaperService() {
                         )
                         c.drawCircle(moonX, moonY, mr * 4.5f, paint)
                         useShader(null)
-                        c.save()
-                        c.rotate(-18f, moonX, moonY)
                         paint.alpha = (255 * moonHorizonAlpha).toInt()
-                        rect.set(moonX - mr, moonY - mr, moonX + mr, moonY + mr)
+                        val moonSize = mr * (256f / 56f)
+                        rect.set(moonX - moonSize / 2f, moonY - moonSize / 2f, moonX + moonSize / 2f, moonY + moonSize / 2f)
                         c.drawBitmap(mb, null, rect, paint)
                         paint.alpha = 255
-                        c.restore()
                     }
                 }
             }
