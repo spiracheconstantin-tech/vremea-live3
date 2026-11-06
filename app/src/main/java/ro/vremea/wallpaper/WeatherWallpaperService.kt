@@ -309,7 +309,7 @@ class WeatherWallpaperService : WallpaperService() {
                         flatStyle = ap0.getBoolean("wp_flat", false)
             val n = when (k) {
                 4, 6 -> rainN()
-                5 -> when (code) { 71, 85 -> 125; 73 -> 210; 75, 86 -> 340; else -> 145 }
+                5 -> when (code) { 71, 85 -> 125; 73 -> 210; 75, 86 -> 420; else -> 145 }
                 else -> 0
             }
             parts = ArrayList()
@@ -340,7 +340,7 @@ class WeatherWallpaperService : WallpaperService() {
             val nc = when (k) {
                 0 -> 0
                 1 -> max(4, (cloud / 100f * 11f).roundToInt())
-                2 -> max(4, (cloud / 100f * 6f).roundToInt())
+                2 -> max(8, (cloud / 100f * 10f).roundToInt())
                 6 -> 6
                 3 -> 3
                 else -> 3
@@ -1153,6 +1153,23 @@ class WeatherWallpaperService : WallpaperService() {
                     )
                     c.drawCircle(sx, sy, r, paint)
                     useShader(null)
+                    // Reflexii luminoase sub soare care se mișcă ușor în timpul zilei și la apus.
+                    if (k == 0) {
+                        for (i in 0..3) {
+                            val phase = t * (0.34f + i * 0.07f) + i * 1.8f
+                            val lineY = sy + r * (1.8f + i * 0.52f) + sin(phase) * h * 0.004f
+                            val span = w * (0.055f + i * 0.017f)
+                            val center = sx + sin(phase * 0.55f) * w * 0.016f
+                            val glint = Path().apply {
+                                moveTo(center - span, lineY)
+                                cubicTo(center - span * 0.35f, lineY - h * 0.003f,
+                                    center + span * 0.22f, lineY + h * 0.002f, center + span, lineY - h * 0.0015f)
+                            }
+                            sp.color = if (dusk > 0.25f) Color.argb(40, 255, 211, 165) else Color.argb(26, 255, 248, 220)
+                            sp.strokeWidth = max(1.5f, w * (0.0024f + i * 0.00025f))
+                            c.drawPath(glint, sp)
+                        }
+                    }
                 } else {
                     // Calea Lactee
                     c.save()
@@ -1215,7 +1232,7 @@ class WeatherWallpaperService : WallpaperService() {
                     val forceMoonForTest = testScenario != null && !day && code == 0
                     val shownMoonAltitude = if (forceMoonForTest) max(moonAltitude, 8.0) else moonAltitude
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
-                    val moonY = h * (0.56f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.40f)
+                    val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
                     val illum = (1f - cos((2.0 * PI * ph.toDouble()).toFloat())) / 2f
                     if (moonAltitude > -3.0 || forceMoonForTest) {
@@ -1528,7 +1545,7 @@ class WeatherWallpaperService : WallpaperService() {
             if (fxButterflies) butterflies.draw(c, w, h, t, dtf, day && k <= 2 && tC in 17f..35f, tiltX)
             if (fxGrass) grass.draw(c, w, h, t, dtf, k != 5, hx, wspd, day, tiltX)
             if (fxPlanets) planets.draw(c, w, h, t, !day && k == 0 && cloud < 15)
-            if (fxLake && scene != 1) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd, scene, (sx / w).coerceIn(0f, 1f))
+            if (fxLake && scene != 1 && !(day && tC >= 35f)) lake.draw(c, w, h, t, day, cloud, k == 4 || k == 6, wspd, scene, (sx / w).coerceIn(0f, 1f))
             if (fxWeatherTransition) weatherTransition.draw(c, w, h, k, dtf, day)
             // vigneta fina (creata o singura data)
             if (fxBirds) birds.draw(c, w, h, t, day && k <= 2, hx)
@@ -1540,14 +1557,19 @@ class WeatherWallpaperService : WallpaperService() {
             val localCalendar = Calendar.getInstance()
             seasonalFx.draw(c, w, h, t, dtf, localCalendar.get(Calendar.MONTH), now, tC, code, day, hx,
                 reduceMotion, qMul, fxLeaves, fxFrost, fxBlossoms, fxPollen, fxFireflies, fxDew)
-            // La caniculă, reflexe fine de aer încins înlocuiesc benzile ondulate de la bază.
+            // La caniculă, reflexe discrete de aer încins înlocuiesc liniile reflexiei din lac.
             if (day && tC >= 35f) {
-                paint.color = Color.argb(34, 245, 229, 187)
-                for (i in 0 until 9) {
-                    val x = w * ((i * 0.137f + t * 0.002f) % 1f)
-                    val y = h * (0.69f + (i % 4) * 0.047f)
-                    val r = max(1.2f, w * (0.0012f + (i % 3) * 0.0006f))
-                    c.drawCircle(x, y, r, paint)
+                for (i in 0 until 6) {
+                    val x = w * ((i * 0.183f + t * 0.0012f) % 1f)
+                    val y = h * (0.74f + (i % 3) * 0.055f + sin(t * 0.14f + i) * 0.004f)
+                    val rx = w * (0.012f + (i % 3) * 0.004f)
+                    val ry = h * (0.0025f + (i % 2) * 0.001f)
+                    rect.set(x - rx, y - ry, x + rx, y + ry)
+                    paint.shader = RadialGradient(x, y, rx,
+                        intArrayOf(Color.argb(38, 252, 239, 204), Color.argb(0, 252, 239, 204)),
+                        floatArrayOf(0f, 1f), Shader.TileMode.CLAMP)
+                    c.drawOval(rect, paint)
+                    paint.shader = null
                 }
             }
             val vk = w.toLong() * 10000L + h.toLong()
