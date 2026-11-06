@@ -47,35 +47,48 @@ class AuroraFx {
         val tgt = if (ok && season) 1f else 0f
         level += (tgt - level) * min(1f, 0.02f * dtf)
         if (level < 0.02f) return
-        val len = h * 0.30f
+        val len = h * 0.19f
         if (sk != h.toInt()) {
-            val cols = intArrayOf(0x3DFFA0, 0x30E0D0, 0x9B6BFF)
+            val cols = intArrayOf(0xFF56E6A4.toInt(), 0xFF43DCCB.toInt(), 0xFF9B83FF.toInt())
             for (l in 0 until 3) {
                 val rgb = cols[l]
                 sh[l] = LinearGradient(
                     0f, 0f, 0f, len,
-                    intArrayOf(rgb, (0xC8 shl 24) or rgb, rgb),
-                    floatArrayOf(0f, 0.75f, 1f), Shader.TileMode.CLAMP
+                    intArrayOf(Color.argb(0, Color.red(rgb), Color.green(rgb), Color.blue(rgb)),
+                        Color.argb(118, Color.red(rgb), Color.green(rgb), Color.blue(rgb)),
+                        Color.argb(0, Color.red(rgb), Color.green(rgb), Color.blue(rgb))),
+                    floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP
                 )
             }
             sk = h.toInt()
         }
-        val step = 18f * max(0.7f, w / 1080f)
+        c.save()
+        c.clipRect(0f, 0f, w, h * 0.28f)
+        val steps = 18
+        val weights = floatArrayOf(0.55f, 0.39f, 0.27f)
         for (l in 0 until 3) {
-            p.shader = sh[l]
-            val weight = if (l == 0) 0.55f else if (l == 1) 0.4f else 0.3f
-            var x = 0f
-            while (x < w) {
-                val y = h * (0.08f + 0.05f * l) + sin(x * 0.0045f + t * 0.25f + l * 1.7f) * h * 0.04f + sin(x * 0.011f - t * 0.4f) * h * 0.012f
-                val a = (0.55f + 0.45f * sin(x * 0.008f + t * 0.6f + l)) * level * weight
-                p.alpha = (255f * a).toInt().coerceIn(0, 255)
-                c.save()
-                c.translate(x, y)
-                c.drawRect(0f, 0f, step + 1f, len, p)
-                c.restore()
-                x += step
+            val base = h * (0.035f + 0.018f * l)
+            val path = Path()
+            fun upper(x: Float): Float = base +
+                sin(x / max(1f, w) * (2f * Math.PI.toFloat()) + t * 0.20f + l * 1.6f) * h * 0.014f +
+                sin(x / max(1f, w) * (5f * Math.PI.toFloat()) - t * 0.13f) * h * 0.006f
+            fun lower(x: Float): Float = base + len * (0.53f + 0.06f * sin(x / max(1f, w) * (2f * Math.PI.toFloat()) - t * 0.16f + l))
+            path.moveTo(0f, upper(0f))
+            for (i in 1..steps) {
+                val x = w * i / steps
+                path.lineTo(x, upper(x))
             }
+            path.lineTo(w, lower(w))
+            for (i in steps - 1 downTo 0) {
+                val x = w * i / steps
+                path.lineTo(x, lower(x))
+            }
+            path.close()
+            p.shader = sh[l]
+            p.alpha = (255f * level * weights[l]).toInt().coerceIn(0, 255)
+            c.drawPath(path, p)
         }
+        c.restore()
         p.shader = null
         p.alpha = 255
     }
