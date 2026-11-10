@@ -170,7 +170,14 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) myLocation()
+        if (requestCode == 1) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                myLocation()
+            } else {
+                toast("Accesul la locație a fost refuzat. Încerc să estimez zona prin internet.")
+                byIp()
+            }
+        }
     }
 
     // ---------- meniu ----------
@@ -491,9 +498,24 @@ class MainActivity : Activity() {
                 if (l != null) { setCurrent("Locația mea", l.latitude, l.longitude); return }
             } catch (e: Exception) { }
         } else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 1)
+            if (prefs.getBoolean("location_explained", false)) {
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 1)
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle("Locația ta pentru vreme")
+                    .setMessage("Accesul aproximativ la locație ajută aplicația să afișeze vremea pentru zona ta și să poziționeze corect soarele și luna pe wallpaper. Dacă refuzi accesul, aplicația încearcă să estimeze zona prin internet sau poți alege manual un oraș.")
+                    .setPositiveButton("Continuă") { _, _ ->
+                        prefs.edit().putBoolean("location_explained", true).apply()
+                        requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 1)
+                    }
+                    .setNegativeButton("Fără locație") { _, _ ->
+                        prefs.edit().putBoolean("location_explained", true).apply()
+                        byIp()
+                    }
+                    .show()
+            }
         }
-        byIp()
+        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) byIp()
     }
 
     private fun byIp() {
