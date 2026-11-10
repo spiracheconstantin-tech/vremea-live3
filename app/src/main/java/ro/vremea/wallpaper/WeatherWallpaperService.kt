@@ -150,7 +150,7 @@ class WeatherWallpaperService : WallpaperService() {
         private var fxFireflies = true
         private var fxDew = true
         private val fxPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion" || key == "wp_stars" || key == "wp_quality") {
+            if (key?.startsWith("wp_fx_") == true || key == "wp_scene" || key == "wp_reduce_motion" || key == "wp_stars" || key == "wp_quality" || key == "wp_flat") {
                 handler.removeCallbacks(reloadFxSettings)
                 handler.postDelayed(reloadFxSettings, 180L)
             } else if (key == "test" || key == "test_min") {
