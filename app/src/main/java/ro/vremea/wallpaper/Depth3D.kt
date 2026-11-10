@@ -52,10 +52,10 @@ class Hills3D {
         tx: Float, ty: Float, t: Float, wspd: Float, hx: Float, tC: Float, scene: Int = 0
     ) {
         val bw = max(1, (w * 1.2f).toInt())
-        val bh = max(1, (h * 0.24f).toInt())
+        val bh = max(1, (h * 0.32f).toInt())
         val kk = (k * 2 + (if (day) 1 else 0)).toLong() * 100000000L + w.toLong() * 10000L + h.toLong() + scene
         if (key != kk) {
-            build(bw, bh, k, bot, day)
+            build(bw, bh, k, bot, day, scene)
             genTrees(bw, bh, scene)
             key = kk
         }
@@ -72,8 +72,40 @@ class Hills3D {
             val top = h - bh + oy
             c.drawBitmap(b, ox, top, paint)
             if (l == 1 && scene == 0) drawHouses(c, ox, top, bhf, bw, day, tC, t, wspd, hx, bot)
-            if (l == 2) drawTrees(c, ox, top, bhf, k, day, mo, t, wspd, hx)
+            if (l == 2) drawTrees(c, ox, top, bhf, k, day, mo, t, wspd, hx, scene)
         }
+        if (scene == 2) drawLake(c, w, h, t, day)
+    }
+
+    private fun drawLake(c: Canvas, w: Float, h: Float, t: Float, day: Boolean) {
+        val waterline = h * 0.79f
+        val water = Path().apply {
+            moveTo(0f, waterline + h * 0.035f)
+            cubicTo(w * 0.18f, waterline - h * 0.035f, w * 0.31f, waterline + h * 0.025f, w * 0.49f, waterline - h * 0.005f)
+            cubicTo(w * 0.67f, waterline - h * 0.04f, w * 0.82f, waterline + h * 0.035f, w, waterline - h * 0.015f)
+            lineTo(w, h)
+            lineTo(0f, h)
+            close()
+        }
+        p.style = Paint.Style.FILL
+        p.shader = LinearGradient(0f, waterline, 0f, h,
+            intArrayOf(if (day) 0xD979B8C7.toInt() else 0xE62E526E.toInt(), if (day) 0xF536788F.toInt() else 0xF4143048.toInt()),
+            null, Shader.TileMode.CLAMP)
+        c.drawPath(water, p)
+        p.shader = null
+        p.style = Paint.Style.STROKE
+        p.strokeCap = Paint.Cap.ROUND
+        p.strokeWidth = max(1.5f, h * 0.002f)
+        p.color = if (day) 0xAAE4F5E8.toInt() else 0x889DBBD8.toInt()
+        val span = w * 0.12f
+        for (i in 0 until 9) {
+            val y = waterline + h * (0.055f + i * 0.021f)
+            val drift = kotlin.math.sin(t * 0.55f + i * 0.9f) * w * 0.012f
+            val x = w * 0.5f + drift
+            c.drawLine(x - span * (0.45f + (i % 3) * 0.18f), y, x + span * (0.45f + (i % 3) * 0.18f), y, p)
+        }
+        p.style = Paint.Style.FILL
+        p.color = 0xFF000000.toInt()
     }
 
     private fun genTrees(bw: Int, bh: Int, scene: Int) {
@@ -85,14 +117,14 @@ class Hills3D {
         while (x < bwf && trN < maxT) {
             seed = (seed * 1103515245 + 12345) and 0x7fffffff
             trX[trN] = x
-            trH[trN] = bhf * (0.12f + 0.11f * ((seed % 100) / 100f))
+            trH[trN] = bhf * (0.12f + 0.11f * ((seed % 100) / 100f)) * when (scene) { 1 -> 1.55f; 2 -> 0.72f; else -> 1f }
             trV[trN] = (seed / 100) % 12
             trN++
-            x += when (scene) { 1 -> 24f + (seed % 22); 2 -> 62f + (seed % 38); else -> 42f + (seed % 40) }
+            x += when (scene) { 1 -> 15f + (seed % 17); 2 -> 82f + (seed % 42); else -> 42f + (seed % 40) }
         }
     }
 
-    private fun drawTrees(c: Canvas, ox: Float, oy: Float, bhf: Float, k: Int, day: Boolean, mo: Int, t: Float, wspd: Float, hx: Float) {
+    private fun drawTrees(c: Canvas, ox: Float, oy: Float, bhf: Float, k: Int, day: Boolean, mo: Int, t: Float, wspd: Float, hx: Float, scene: Int) {
         val winter = mo == 11 || mo <= 1
         val spring = mo in 2..4
         val summer = mo in 5..7
@@ -106,7 +138,7 @@ class Hills3D {
             c.translate(ox + x, oy + ry(2, x, bhf) + 2f)
             c.rotate(sway)
             p.style = Paint.Style.FILL
-            if (trV[i] % 5 == 0 || trV[i] % 5 == 3) {
+            if (scene == 1 || trV[i] % 5 == 0 || trV[i] % 5 == 3) {
                 var col = mix(0xFF2D6A3E.toInt(), Color.BLACK, night)
                 if (snow) col = mix(col, Color.WHITE, 0.55f)
                 p.color = col
@@ -197,11 +229,15 @@ class Hills3D {
         }
     }
 
-    private fun build(bw: Int, bh: Int, k: Int, bot: Int, day: Boolean) {
+    private fun build(bw: Int, bh: Int, k: Int, bot: Int, day: Boolean, scene: Int) {
         val ground = when {
             k == 5 -> Color.rgb(236, 241, 249)
             k == 4 || k == 6 -> if (day) Color.rgb(38, 67, 67) else Color.rgb(12, 25, 34)
             k == 3 -> if (day) Color.rgb(91, 111, 102) else Color.rgb(25, 34, 43)
+            scene == 1 && day -> Color.rgb(34, 74, 48)
+            scene == 1 -> Color.rgb(12, 31, 27)
+            scene == 2 && day -> Color.rgb(73, 127, 112)
+            scene == 2 -> Color.rgb(20, 44, 57)
             day -> Color.rgb(52, 98, 72)
             else -> Color.rgb(14, 24, 32)
         }
@@ -257,6 +293,9 @@ class Hills3D {
         }
     }
 }
+
+
+
 
 
 
