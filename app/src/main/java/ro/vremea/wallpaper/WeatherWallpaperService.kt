@@ -1162,7 +1162,7 @@ class WeatherWallpaperService : WallpaperService() {
                     val phase = moonPhase()
                     val mb = moonBitmap(phase)
                     // Lună compactă, ceva mai mare decât în P35, scalată după ecran.
-                    val mr = min(w, h) * 0.027f
+                    val mr = min(w, h) * 0.031f
                     val testScenario = TestMode.read(this@WeatherWallpaperService)
                     val moonTime = if (testScenario != null) {
                         val local = Calendar.getInstance()
