@@ -900,9 +900,10 @@ class WeatherWallpaperService : WallpaperService() {
                         if (cr[3] > 0f && d < cr[2] * 1.7f) alb += 0.16f * (1f - d / (cr[2] * 1.7f))
                     }
                     alb *= (0.78f + 0.22f * z)
-                    val lum = alb.coerceIn(0f, 1f) * (0.08f + 0.92f * kLit)
+                    // Lumina slabă de pe emisfera întunecată sugerează earthshine, fără să șteargă faza.
+                    val lum = alb.coerceIn(0f, 1f) * (0.13f + 0.87f * kLit)
                     val edge = ((1f - rr) / 0.025f).coerceIn(0f, 1f)
-                    val alpha = (edge * (0.2f + 0.8f * kLit) * 255f).toInt().coerceIn(0, 255)
+                    val alpha = (edge * 255f).toInt().coerceIn(0, 255)
                     px[j * n + i] = Color.argb(
                         alpha,
                         (246f * lum).toInt().coerceIn(0, 255),
@@ -1160,8 +1161,8 @@ class WeatherWallpaperService : WallpaperService() {
                     // Faza reală a lunii este calculată din data curentă și păstrată în desen.
                     val phase = moonPhase()
                     val mb = moonBitmap(phase)
-                    // Disc lunar ~70% mai mic decât versiunea anterioară, scalat după lățimea ecranului.
-                    val mr = min(w, h) * 0.022f
+                    // Lună compactă, ceva mai mare decât în P35, scalată după ecran.
+                    val mr = min(w, h) * 0.027f
                     val testScenario = TestMode.read(this@WeatherWallpaperService)
                     val moonTime = if (testScenario != null) {
                         val local = Calendar.getInstance()
@@ -1175,14 +1176,15 @@ class WeatherWallpaperService : WallpaperService() {
                     }
                     val moonPosition = cachedMoonPosition
                     val moonAltitude = moonPosition.altitudeDeg
-                    // Scenariul de test „noapte cu lună” rămâne vizibil pentru previzualizare, indiferent de faza reală din ziua respectivă.
+                    // Păstrează luna vizibilă în nopțile senine; poziția reală este folosită când se află deasupra orizontului.
                     val forceMoonForTest = testScenario != null && !day && code == 0
-                    val shownMoonAltitude = if (forceMoonForTest) max(moonAltitude, 8.0) else moonAltitude
+                    val forceMoonForNight = !day && k <= 1 && moonAltitude <= -3.0
+                    val shownMoonAltitude = if (forceMoonForTest || forceMoonForNight) max(moonAltitude, 8.0) else moonAltitude
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
                     val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
                     val illum = ((1f - cos(2.0 * PI * phase).toFloat()) * 0.5f).coerceIn(0.04f, 1f)
-                    if (moonAltitude > -3.0 || forceMoonForTest) {
+                    if (moonAltitude > -3.0 || forceMoonForTest || forceMoonForNight) {
                         useShader(
                             RadialGradient(
                                 moonX, moonY, mr * 3.0f,
