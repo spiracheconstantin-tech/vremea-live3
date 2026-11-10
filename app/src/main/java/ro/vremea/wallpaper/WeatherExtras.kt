@@ -119,13 +119,14 @@ internal fun chooseWallpaperScene(context: Context) {
     AlertDialog.Builder(context)
         .setTitle("Peisajul fundalului animat")
         .setSingleChoiceItems(labels, selected) { dialog, which ->
-            prefs.edit().putInt("wp_scene", which).apply()
+            prefs.edit().putInt("wp_scene", which).commit()
             dialog.dismiss()
-            Toast.makeText(context, "Peisaj actualizat", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Peisaj aplicat: ${labels[which]}", Toast.LENGTH_SHORT).show()
         }
         .setNegativeButton("Închide", null)
         .show()
 }
+
 
 
 
