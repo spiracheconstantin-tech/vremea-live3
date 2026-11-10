@@ -197,7 +197,6 @@ class MainActivity : Activity() {
         m.menu.add(0, 11, 10, "🌅 Rezumat de dimineață: " + (if (prefs.getBoolean("morning", false)) "pornit" else "oprit"))
         m.menu.add(0, 12, 11, "☔ Alertă ploaie în curând: " + (if (prefs.getBoolean("rainsoon", false)) "pornită" else "oprită"))
         m.menu.add(0, 13, 12, "🧪 Mod test fundal")
-        m.menu.add(0, 14, 13, "⬆️ Caută actualizări")
                 m.menu.add(0, 15, 14, "🌡️ Temperatura în bara de stare: " + (if (prefs.getBoolean("statustemp", false)) "pornită" else "oprită"))
         m.menu.add(0, 16, 15, "🎨 Stil fundal: " + (if (prefs.getBoolean("wp_flat", false)) "desenat" else "realist"))
         m.menu.add(0, 17, 16, "📤 Partajează vremea")
@@ -228,7 +227,6 @@ class MainActivity : Activity() {
                 11 -> toggleSmart(this, "morning", "Rezumat de dimineață")
                 12 -> toggleSmart(this, "rainsoon", "Alertă ploaie")
                 13 -> testMode(this)
-                14 -> checkUpdate(this)
                                 15 -> toggleTemp(this)
                 16 -> toggleFlat(this)
                 17 -> shareWeather(this)
@@ -756,6 +754,8 @@ class MainActivity : Activity() {
         add(tv(footerLabel, 11f, alpha = .72f).apply { gravity = Gravity.CENTER }, 14)
     }
 }
+
+
 
 
 
