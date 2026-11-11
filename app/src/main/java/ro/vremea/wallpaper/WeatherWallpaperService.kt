@@ -91,6 +91,11 @@ class WeatherWallpaperService : WallpaperService() {
         @Volatile private var moonLongitude = 26.1025
         private var moonPositionMinute = Long.MIN_VALUE
         private var cachedMoonPosition = MoonSkyPosition.Point(0.0, 0.0)
+        private var moonOverlayX = 0f
+        private var moonOverlayY = 0f
+        private var moonOverlayRadius = 0f
+        private var moonOverlayAlpha = 0
+        private var moonOverlayBitmap: Bitmap? = null
         private var parts = ArrayList<P>()
         private var frostFlakes = ArrayList<P>()
         private var hail = ArrayList<P>()
@@ -1078,7 +1083,7 @@ class WeatherWallpaperService : WallpaperService() {
 
             // soare / luna + stele
             if (k <= 1 && flatStyle && day) flat.draw(c, true, sx, sy, w, h, t)
-            if (k <= 1 && (!flatStyle || !day)) {
+            if (!day || (k <= 1 && !flatStyle)) {
                 if (day) {
                     val warm = (1f - dist / 120f).coerceIn(0f, 1f)
                     val coldSun = if (tC <= -8f) 0.62f else if (tC <= 0f) 0.80f else 1f
@@ -1183,12 +1188,19 @@ class WeatherWallpaperService : WallpaperService() {
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
                     val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
+                    val moonGlowStrength = max(illum, 0.24f)
+                    val moonVisible = moonAltitude > -3.0 || forceMoonForTest || forceMoonForNight
+                    moonOverlayAlpha = if (!day && moonVisible && cloud >= 20) (180f * (cloud / 100f) * moonGlowStrength * moonHorizonAlpha).toInt().coerceIn(0, 58) else 0
+                    moonOverlayX = moonX
+                    moonOverlayY = moonY
+                    moonOverlayRadius = mr
+                    moonOverlayBitmap = mb
                     val illum = ((1f - cos(2.0 * PI * phase).toFloat()) * 0.5f).coerceIn(0.04f, 1f)
                     if (moonAltitude > -3.0 || forceMoonForTest || forceMoonForNight) {
                         useShader(
                             RadialGradient(
                                 moonX, moonY, mr * 3.0f,
-                                intArrayOf(Color.argb((54 * illum * moonHorizonAlpha).toInt(), 220, 230, 255), 0),
+                                intArrayOf(Color.argb((54 * moonGlowStrength * moonHorizonAlpha).toInt(), 220, 230, 255), 0),
                                 floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
                             )
                         )
@@ -1234,6 +1246,22 @@ class WeatherWallpaperService : WallpaperService() {
             paint.colorFilter = null
             paint.alpha = 255
 
+            // Prin nori, refacem luna cu transparență și un halou discret; faza și poziția rămân calculate.
+            val cloudMoon = moonOverlayBitmap
+            if (!day && cloudMoon != null && moonOverlayAlpha > 0) {
+                val haloAlpha = (moonOverlayAlpha * 1.5f).toInt().coerceIn(0, 82)
+                useShader(RadialGradient(moonOverlayX, moonOverlayY, moonOverlayRadius * 4.2f,
+                    intArrayOf(Color.argb(haloAlpha, 210, 222, 255), Color.argb(haloAlpha / 3, 190, 205, 240), 0),
+                    floatArrayOf(0f, 0.46f, 1f), Shader.TileMode.CLAMP))
+                c.drawCircle(moonOverlayX, moonOverlayY, moonOverlayRadius * 4.2f, paint)
+                useShader(null)
+                paint.alpha = (moonOverlayAlpha * 0.72f).toInt().coerceIn(0, 255)
+                val cloudMoonSize = moonOverlayRadius * (256f / 56f)
+                rect.set(moonOverlayX - cloudMoonSize / 2f, moonOverlayY - cloudMoonSize / 2f,
+                    moonOverlayX + cloudMoonSize / 2f, moonOverlayY + cloudMoonSize / 2f)
+                c.drawBitmap(cloudMoon, null, rect, paint)
+                paint.alpha = 255
+            }
             // dealuri pe 3 straturi (pune showHills = false sus ca sa le scoti)
             if (showHillsV) hills3.draw(c, paint, w, h, k, bot, day, tiltX, tiltY, t, wspd, hx, tC, scene)
             if (false) {
@@ -1534,6 +1562,7 @@ class WeatherWallpaperService : WallpaperService() {
         }
     }
 }
+
 
 
 
