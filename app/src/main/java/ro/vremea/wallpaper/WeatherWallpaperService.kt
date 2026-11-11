@@ -1188,6 +1188,7 @@ class WeatherWallpaperService : WallpaperService() {
                     val moonX = w * (0.5f + 0.46f * sin(Math.toRadians(moonPosition.hourAngleDeg)).toFloat())
                     val moonY = h * (0.36f - (shownMoonAltitude.coerceIn(0.0, 90.0) / 90.0).toFloat() * 0.28f)
                     val moonHorizonAlpha = ((shownMoonAltitude + 3.0) / 10.0).coerceIn(0.0, 1.0).toFloat()
+                    val illum = ((1f - cos(2.0 * PI * phase).toFloat()) * 0.5f).coerceIn(0.04f, 1f)
                     val moonGlowStrength = max(illum, 0.24f)
                     val moonVisible = moonAltitude > -3.0 || forceMoonForTest || forceMoonForNight
                     moonOverlayAlpha = if (!day && moonVisible && cloud >= 20) (180f * (cloud / 100f) * moonGlowStrength * moonHorizonAlpha).toInt().coerceIn(0, 58) else 0
@@ -1195,7 +1196,6 @@ class WeatherWallpaperService : WallpaperService() {
                     moonOverlayY = moonY
                     moonOverlayRadius = mr
                     moonOverlayBitmap = mb
-                    val illum = ((1f - cos(2.0 * PI * phase).toFloat()) * 0.5f).coerceIn(0.04f, 1f)
                     if (moonAltitude > -3.0 || forceMoonForTest || forceMoonForNight) {
                         useShader(
                             RadialGradient(
